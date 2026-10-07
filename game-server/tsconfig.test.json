@@ -1,23 +1,8 @@
-{
+﻿{
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "dist-test",
-    "rootDir": ".",
-    "strict": true,
-    "skipLibCheck": true,
-    "noEmitOnError": false,
-    "noImplicitAny": false
+    "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "outDir": "dist-test", "rootDir": ".",
+    "strict": true, "skipLibCheck": true, "types": ["node"]
   },
-  "include": [
-    "src/effects/wallet.ts",
-    "src/effects/reverb.ts",
-    "src/ws/protocol.ts",
-    "src/tables/registry.ts",
-    "src/tables/runner.ts",
-    "src/auth/password.ts",
-    "test/**/*.ts",
-    "shim/*.d.ts"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

@@ -1,16 +1,8 @@
-{
+﻿{
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "dist-test",
-    "rootDir": ".",
-    "strict": true,
-    "skipLibCheck": true
+    "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "outDir": "dist-test", "rootDir": ".",
+    "strict": true, "skipLibCheck": true, "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "shim/*.d.ts"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

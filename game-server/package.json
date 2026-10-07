@@ -9,12 +9,15 @@
   },
   "dependencies": {
     "@muhabbetly/batak-engine": "file:../batak-engine",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
     "pg": "^8.13.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/pg": "^8.11.10",
+    "@types/ws": "^8.18.2",
     "typescript": "^5.6.3"
   }
 }
