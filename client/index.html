@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Batak — Muhabbetly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16242a; --felt:#1b3138; --felt-hi:#224049;
+  --rail:#8a6a3c; --rail-hi:#c49a5c;
+  --bone:#ece6d9; --muted:#8fa6ac; --dim:#5d7b83;
+  --spade:#1a1a1a; --heart:#c7302b; --diamond:#2d6fc4; --club:#2f7d4f;
+  --live:#d9a441; --ok:#7fb069; --bad:#d8504b;
+  --card-w:clamp(44px,8.5vw,62px);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%}
+body{
+  margin:0; background:var(--ink); color:var(--bone); overflow:hidden;
+  font-family:Archivo,system-ui,sans-serif; font-size:15px;
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+}
+
+/* ---------- çerçeve ---------- */
+.app{display:flex; flex-direction:column; height:100%}
+
+.bar{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:10px 14px; border-bottom:1px solid #27454d; background:var(--ink);
+  font-size:13px; min-height:46px;
+}
+.bar .ttl{font-weight:600; font-variation-settings:"wdth" 108}
+.bar .sep{color:var(--dim)}
+.trump{display:inline-flex; align-items:center; gap:5px}
+.trump b{font-size:17px; line-height:1}
+.bar .right{margin-left:auto; display:flex; gap:12px; align-items:center}
+.conn{display:inline-flex; align-items:center; gap:6px; color:var(--muted)}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--dim)}
+.dot.on{background:var(--ok)}
+.dot.off{background:var(--bad)}
+
+/* ---------- masa ---------- */
+.felt{
+  flex:1; position:relative; min-height:0;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, var(--felt-hi), var(--felt) 70%);
+  border-top:2px solid var(--rail);
+  border-bottom:2px solid var(--rail);
+}
+
+/* oyuncu etiketleri */
+.seat{
+  position:absolute; display:flex; flex-direction:column; gap:3px;
+  padding:7px 11px; border-radius:7px; background:rgba(10,20,24,.5);
+  border:1px solid transparent; min-width:92px; font-size:12.5px;
+}
+.seat.active{border-color:var(--live); background:rgba(217,164,65,.14)}
+.seat.me{background:rgba(10,20,24,.65)}
+.seat .nm{font-weight:600; display:flex; align-items:center; gap:6px}
+.seat .st{color:var(--muted); font-size:11.5px; display:flex; gap:7px}
+.seat .tag{color:var(--live)}
+.seat .tag.off{color:var(--bad)}
+.seat.s0{bottom:14px; left:14px}
+.seat.s1{left:14px; top:50%; transform:translateY(-50%)}
+.seat.s2{top:14px; left:50%; transform:translateX(-50%)}
+.seat.s3{right:14px; top:50%; transform:translateY(-50%)}
+
+/* süre halkası */
+.ring{width:100%; height:3px; border-radius:2px; background:rgba(255,255,255,.12); overflow:hidden}
+.ring i{display:block; height:100%; background:var(--live); width:100%}
+
+/* orta — oynanan tur */
+.trick{
+  position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+  display:grid; grid-template-columns:repeat(3,var(--card-w));
+  grid-template-rows:repeat(3,calc(var(--card-w)*1.45));
+  gap:4px; place-items:center;
+}
+.trick .slot{display:flex; align-items:center; justify-content:center}
+.trick .p0{grid-area:3/2} .trick .p1{grid-area:2/1}
+.trick .p2{grid-area:1/2} .trick .p3{grid-area:2/3}
+
+/* el sonu / bilgi balonu */
+.toast{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  background:rgba(10,20,24,.93); border:1px solid var(--rail);
+  padding:18px 24px; border-radius:10px; text-align:center;
+  max-width:min(340px,86vw); display:none; z-index:5;
+}
+.toast.show{display:block}
+.toast h3{margin:0 0 8px; font-size:17px; font-weight:600}
+.toast p{margin:3px 0; font-size:13.5px; color:var(--muted)}
+.toast .big{font-size:26px; font-weight:700; color:var(--live); margin:6px 0}
+
+/* ---------- kart ---------- */
+.card{
+  width:var(--card-w); aspect-ratio:5/7; border-radius:6px; flex:none;
+  background:#fbf8f1; color:var(--c,#1a1a1a);
+  border:1px solid rgba(0,0,0,.25);
+  box-shadow:0 2px 5px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-variation-settings:"wdth" 92; line-height:1; user-select:none;
+}
+.card .r{font-size:calc(var(--card-w)*.46); font-weight:700}
+.card .s{font-size:calc(var(--card-w)*.36); margin-top:1px}
+.card.back{
+  background:
+    repeating-linear-gradient(45deg,#2b4a54 0 5px,#24404a 5px 10px);
+  border-color:#1a3038;
+}
+.card.sm{--card-w:clamp(30px,5.5vw,40px)}
+
+/* ---------- elim ---------- */
+.hand{
+  padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px));
+  background:var(--ink); border-top:1px solid #27454d;
+  display:flex; justify-content:center; gap:3px; overflow-x:auto;
+  scrollbar-width:none;
+}
+.hand::-webkit-scrollbar{display:none}
+.hand .card{cursor:default; transition:transform .12s ease, opacity .12s ease}
+.hand .card.legal{cursor:pointer}
+.hand .card.illegal{opacity:.34}
+.hand .card.legal:hover,.hand .card.legal:focus-visible{transform:translateY(-10px); outline:none}
+.hand .card.legal:focus-visible{box-shadow:0 0 0 2px var(--live)}
+
+/* ---------- eylem çubuğu ---------- */
+.acts{
+  padding:10px 12px; background:var(--ink); border-top:1px solid #27454d;
+  display:none; gap:7px; flex-wrap:wrap; align-items:center; justify-content:center;
+}
+.acts.show{display:flex}
+.acts .lbl{width:100%; text-align:center; font-size:13px; color:var(--muted); margin-bottom:2px}
+button{
+  font:inherit; font-size:14px; cursor:pointer; border-radius:6px;
+  padding:9px 15px; border:1px solid #2f535c; background:#1e3740; color:var(--bone);
+  font-variant-numeric:tabular-nums;
+}
+button:hover:not(:disabled){background:#27454f}
+button:focus-visible{outline:2px solid var(--live); outline-offset:2px}
+button:disabled{opacity:.4; cursor:not-allowed}
+button.primary{background:var(--bone); color:var(--ink); border-color:var(--bone); font-weight:600}
+button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
+
+/* ---------- giriş ekranı ---------- */
+.lobby{
+  position:absolute; inset:0; display:grid; place-items:center;
+  background:var(--ink); z-index:10; padding:24px; text-align:center;
+}
+.lobby.hide{display:none}
+.lobby h1{
+  margin:0 0 6px; font-size:clamp(28px,7vw,40px); font-weight:700;
+  font-variation-settings:"wdth" 112; letter-spacing:-.02em;
+}
+.lobby p{margin:0 0 22px; color:var(--muted); font-size:14px; max-width:40ch}
+.lobby .row{display:flex; gap:9px; justify-content:center; flex-wrap:wrap}
+.err{margin-top:16px; color:var(--bad); font-size:13.5px; min-height:19px}
+
+@media (max-width:420px){
+  .seat{min-width:0; padding:5px 8px; font-size:11.5px}
+  .seat.s0{left:10px; bottom:10px}
+  .bar{font-size:12px; gap:8px; padding:8px 11px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important; animation:none !important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="bar">
+    <span class="ttl" id="vname">Batak</span>
+    <span class="sep">·</span>
+    <span id="handno">—</span>
+    <span class="trump" id="trumpbox" hidden><span class="sep">·</span> Koz <b id="trump"></b></span>
+    <span class="right">
+      <span id="score"></span>
+      <span class="conn"><i class="dot" id="dot"></i><span id="connlbl">bağlı değil</span></span>
+    </span>
+  </div>
+
+  <div class="felt" id="felt">
+    <div class="trick" id="trick"></div>
+
+    <div class="seat s0" data-seat="0"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s1" data-seat="1"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s2" data-seat="2"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s3" data-seat="3"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="lobby" id="lobby">
+      <div>
+        <h1>Batak</h1>
+        <p id="lobbytext">Dört kişilik masa. Oturduğunuzda diğer oyuncular beklenir.</p>
+        <div class="row">
+          <button class="primary" id="sit">Masaya otur</button>
+          <button id="demo">Deneme masası</button>
+        </div>
+        <div class="err" id="lobbyerr"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acts" id="acts"></div>
+  <div class="hand" id="hand"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================================================================
+   Istemci KURAL CALISTIRMAZ. Yalnizca sunucudan gelen gorunumu cizer
+   ve niyet bildirir. Oynanabilir kartlar bile sunucudan gelir
+   (view.hand.myLegalCards) — burada hesaplanmaz.
+   =================================================================== */
+
+const SUITS = [
+  { g: "\u2660", c: "var(--spade)",   n: "Maça"  },
+  { g: "\u2665", c: "var(--heart)",   n: "Kupa"  },
+  { g: "\u2666", c: "var(--diamond)", n: "Karo"  },
+  { g: "\u2663", c: "var(--club)",    n: "Sinek" },
+];
+const RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const suitOf = (c) => Math.floor(c / 13);
+const rankOf = (c) => c % 13;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+
+let ws = null;
+let view = null;       // sunucudan gelen son gorunum
+let mySeat = null;
+let demoMode = false;
+let tickTimer = null;
+
+/* ------------------------------------------------- kart cizimi */
+
+function cardNode(card, extra) {
+  const n = el("div", "card" + (extra ? " " + extra : ""));
+  if (card === null || card === undefined) { n.classList.add("back"); return n; }
+  const s = SUITS[suitOf(card)];
+  n.style.setProperty("--c", s.c);
+  const r = el("div", "r"); r.textContent = RANKS[rankOf(card)];
+  const g = el("div", "s"); g.textContent = s.g;
+  n.append(r, g);
+  n.dataset.card = String(card);
+  n.setAttribute("aria-label", `${RANKS[rankOf(card)]} ${s.n}`);
+  return n;
+}
+
+/* ------------------------------------------------- cizim */
+
+function render() {
+  if (!view) return;
+  const h = view.hand;
+
+  $("vname").textContent = ({
+    esli: "Eşli Batak", ihaleli: "İhaleli Batak",
+    koz: "Koz Batak", gonul: "Gönül Batağı",
+  })[view.variant] || "Batak";
+
+  $("handno").textContent = view.handNo > 0 ? `${view.handNo}. el` : "başlamadı";
+
+  const tb = $("trumpbox");
+  if (h && h.trump !== null && h.trump !== undefined) {
+    tb.hidden = false;
+    const s = SUITS[h.trump];
+    const b = $("trump"); b.textContent = s.g; b.style.color = s.c;
+  } else tb.hidden = true;
+
+  $("score").textContent = view.scores
+    ? view.scores.map((v, i) => (i === mySeat ? `★${v}` : v)).join(" / ")
+    : "";
+
+  // koltuklar — kendi koltugum daima altta gorunur
+  for (let i = 0; i < 4; i++) {
+    const rel = mySeat === null ? i : (i - mySeat + 4) % 4;
+    const node = document.querySelector(`.seat[data-seat="${i}"]`);
+    node.className = `seat s${rel}` + (i === mySeat ? " me" : "");
+    const s = view.seats[i];
+    node.querySelector(".nm").textContent = s.username || "boş koltuk";
+    const tags = [];
+    if (h) tags.push(`${h.tricksWon[i]} tur`);
+    if (h && h.bids && h.bids[i] !== null && h.bids[i] !== undefined) tags.push(`teklif ${h.bids[i]}`);
+    const st = node.querySelector(".st");
+    st.innerHTML = "";
+    const base = el("span"); base.textContent = tags.join(" · "); st.append(base);
+    if (s.bot) { const t = el("span", "tag"); t.textContent = "bot"; st.append(t); }
+    else if (s.disconnected) { const t = el("span", "tag off"); t.textContent = "bağlantı yok"; st.append(t); }
+    if (h && h.turn === i && view.phase === "playing") node.classList.add("active");
+    node.querySelector(".ring").style.visibility =
+      (h && h.turn === i && view.phase === "playing") ? "visible" : "hidden";
+  }
+
+  // ortadaki tur
+  const t = $("trick"); t.innerHTML = "";
+  if (h) {
+    for (const p of h.trick) {
+      const rel = mySeat === null ? p.seat : (p.seat - mySeat + 4) % 4;
+      const slot = el("div", `slot p${rel}`);
+      slot.appendChild(cardNode(p.card));
+      t.appendChild(slot);
+    }
+  }
+
+  renderHand();
+  renderActions();
+  startDeadline();
+}
+
+function renderHand() {
+  const box = $("hand"); box.innerHTML = "";
+  const h = view && view.hand;
+  if (!h || !h.myCards) return;
+
+  const legal = new Set(h.myLegalCards || []);
+  const myTurn = h.turn === mySeat && view.phase === "playing" && h.phase === "playing";
+
+  const sorted = h.myCards.slice().sort((a, b) =>
+    suitOf(a) - suitOf(b) || rankOf(a) - rankOf(b));
+
+  for (const c of sorted) {
+    const ok = myTurn && legal.has(c);
+    const n = cardNode(c, ok ? "legal" : (myTurn ? "illegal" : ""));
+    if (ok) {
+      n.tabIndex = 0;
+      n.addEventListener("click", () => play(c));
+      n.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); play(c); }
+      });
+    }
+    box.appendChild(n);
+  }
+}
+
+function renderActions() {
+  const a = $("acts"); a.innerHTML = ""; a.classList.remove("show");
+  const h = view && view.hand;
+  if (!h || h.turn !== mySeat || view.phase !== "playing") return;
+
+  if (h.phase === "bidding") {
+    a.classList.add("show");
+    const l = el("div", "lbl");
+    l.textContent = h.highBid > 0
+      ? `En yüksek teklif ${h.highBid}. Üstüne çıkın ya da pas geçin.`
+      : "Kaç tur alacağınızı taahhüt edin.";
+    a.appendChild(l);
+    const floor = Math.max(5, h.highBid + 1);
+    for (let v = floor; v <= 13; v++) {
+      const b = el("button"); b.textContent = String(v);
+      b.addEventListener("click", () => send({ type: "bid", value: v }));
+      a.appendChild(b);
+    }
+    const p = el("button"); p.textContent = "Pas";
+    p.addEventListener("click", () => send({ type: "pass" }));
+    a.appendChild(p);
+    return;
+  }
+
+  if (h.phase === "trump") {
+    a.classList.add("show");
+    const l = el("div", "lbl"); l.textContent = "Kozu seçin.";
+    a.appendChild(l);
+    SUITS.forEach((s, i) => {
+      const b = el("button", "suit");
+      b.innerHTML = `<span style="color:${s.c}">${s.g}</span>`;
+      b.setAttribute("aria-label", s.n);
+      b.title = s.n;
+      b.addEventListener("click", () => send({ type: "trump", suit: i }));
+      a.appendChild(b);
+    });
+  }
+}
+
+/* süre göstergesi — sunucudan gelen bitiş damgasına göre */
+function startDeadline() {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  const d = view && view.deadline;
+  if (!d) return;
+  const total = 20000;
+  const bar = document.querySelector(`.seat[data-seat="${d.seat}"] .ring i`);
+  if (!bar) return;
+  const paint = () => {
+    const left = Math.max(0, d.at - Date.now());
+    bar.style.width = Math.min(100, (left / total) * 100) + "%";
+    bar.style.background = left < 5000 ? "var(--bad)" : "var(--live)";
+    if (left <= 0 && tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  };
+  paint();
+  tickTimer = setInterval(paint, 200);
+}
+
+function toast(html, ms) {
+  const t = $("toast");
+  t.innerHTML = html;
+  t.classList.add("show");
+  if (ms) setTimeout(() => t.classList.remove("show"), ms);
+}
+const hideToast = () => $("toast").classList.remove("show");
+
+/* ------------------------------------------------- ağ */
+
+function setConn(state, label) {
+  const d = $("dot");
+  d.className = "dot" + (state === "on" ? " on" : state === "off" ? " off" : "");
+  $("connlbl").textContent = label;
+}
+
+function send(msg) {
+  if (demoMode) { demoHandle(msg); return; }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+const play = (card) => send({ type: "play", card });
+
+async function connect() {
+  $("lobbyerr").textContent = "";
+  setConn("", "bağlanıyor…");
+  let token;
+  try {
+    const r = await fetch("/oyun/bilet", { credentials: "same-origin" });
+    if (!r.ok) throw new Error("bilet alınamadı");
+    token = (await r.json()).token;
+  } catch (e) {
+    setConn("off", "bağlanamadı");
+    $("lobbyerr").textContent =
+      "Giriş bileti alınamadı. Muhabbetly'de oturumunuz açık mı?";
+    return;
+  }
+
+  ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
+    ["bearer", token],
+  );
+
+  ws.onopen = () => {
+    setConn("on", "bağlı");
+    send({ type: "join", variantId: "esli", roomId: new URLSearchParams(location.search).get("oda") });
+  };
+
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    onServer(m);
+  };
+
+  ws.onclose = (ev) => {
+    setConn("off", ev.code === 4001 ? "başka cihazda açıldı" : "bağlantı koptu");
+    if (ev.code === 1012) {
+      toast("<h3>Sunucu yenileniyor</h3><p>Birkaç saniye içinde yeniden bağlanılacak.</p>");
+      setTimeout(connect, 3000);
+    }
+  };
+
+  ws.onerror = () => setConn("off", "bağlantı hatası");
+}
+
+function onServer(m) {
+  switch (m.type) {
+    case "joined":
+    case "rejoined":
+      mySeat = m.seat;
+      $("lobby").classList.add("hide");
+      break;
+    case "state":
+      view = m.view;
+      hideToast();
+      render();
+      if (view.phase === "waiting") {
+        const n = view.seats.filter((s) => s.username).length;
+        toast(`<h3>Oyuncu bekleniyor</h3><p>${n} / 4 kişi masada.</p>`);
+      }
+      if (view.phase === "finished") showResult();
+      break;
+    case "error":
+      $("lobbyerr").textContent = m.message || m.code;
+      if (view) toast(`<h3>Olmadı</h3><p>${m.message || m.code}</p>`, 2600);
+      break;
+    case "hand_aborted":
+      toast(`<h3>El iptal edildi</h3><p>${m.reason}</p>`);
+      break;
+  }
+}
+
+function showResult() {
+  const sc = view.scores;
+  const best = Math.max(...sc);
+  const mine = mySeat === null ? null : sc[mySeat];
+  const won = mine !== null && mine === best;
+  toast(
+    `<h3>Oyun bitti</h3><div class="big">${mine === null ? "" : mine}</div>` +
+    `<p>${won ? "Kazandınız." : "Bu sefer olmadı."}</p>` +
+    `<p>${sc.join(" / ")}</p>`
+  );
+}
+
+/* ===================================================================
+   DENEME MASASI
+   Sunucu olmadan arayuzu gormek icin. Kural motoru DEGILDIR:
+   yalnizca ekrani doldurur, gercek oyunda her sey sunucudan gelir.
+   =================================================================== */
+
+let demo = null;
+
+function demoStart() {
+  demoMode = true;
+  mySeat = 0;
+  $("lobby").classList.add("hide");
+  setConn("on", "deneme");
+
+  const deck = Array.from({ length: 52 }, (_, i) => i);
+  for (let i = 51; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  demo = {
+    hands: [0, 1, 2, 3].map((s) => deck.slice(s * 13, s * 13 + 13)),
+    turn: 0, phase: "bidding", trump: null, trick: [],
+    tricksWon: [0, 0, 0, 0], bids: [null, null, null, null],
+    passed: [false, false, false, false], highBid: 0, highBidder: null,
+    trickNo: 0,
+  };
+  demoView();
+}
+
+function demoView() {
+  const d = demo;
+  const legal = demoLegal(0);
+  view = {
+    variant: "esli", phase: "playing", handNo: 1,
+    scores: [0, 0, 0, 0], dealer: 3,
+    deadline: { at: Date.now() + 20000, seat: d.turn, kind: "play" },
+    seats: [
+      { username: "Siz", bot: false, disconnected: false },
+      { username: "Ayşe", bot: false, disconnected: false },
+      { username: "Mehmet", bot: true, disconnected: false },
+      { username: "Zeynep", bot: false, disconnected: false },
+    ],
+    hand: {
+      phase: d.phase, turn: d.turn, trump: d.trump, trick: d.trick,
+      trickNo: d.trickNo, tricksWon: d.tricksWon, bids: d.bids,
+      highBid: d.highBid, highBidder: d.highBidder,
+      myCards: d.hands[0], myLegalCards: d.turn === 0 ? legal : [],
+    },
+  };
+  render();
+}
+
+function demoLegal(seat) {
+  const d = demo, hand = d.hands[seat];
+  if (d.trick.length === 0) return hand.slice();
+  const led = suitOf(d.trick[0].card);
+  const same = hand.filter((c) => suitOf(c) === led);
+  return same.length ? same : hand.slice();
+}
+
+function demoHandle(msg) {
+  const d = demo;
+  if (!d) return;
+
+  if (msg.type === "bid" && d.turn === 0) {
+    d.bids[0] = msg.value; d.highBid = msg.value; d.highBidder = 0;
+    d.phase = "trump"; demoView(); return;
+  }
+  if (msg.type === "pass" && d.turn === 0) {
+    d.passed[0] = true;
+    // deneme masasinda rakipler hemen pas gecer, ihale sizde kalir
+    d.bids[0] = 5; d.highBid = 5; d.highBidder = 0; d.phase = "trump";
+    demoView(); return;
+  }
+  if (msg.type === "trump" && d.phase === "trump") {
+    d.trump = msg.suit; d.phase = "playing"; d.turn = 0; demoView(); return;
+  }
+  if (msg.type === "play" && d.turn === 0 && d.phase === "playing") {
+    demoPlay(0, msg.card);
+    setTimeout(demoBots, 650);
+  }
+}
+
+function demoPlay(seat, card) {
+  const d = demo;
+  d.hands[seat] = d.hands[seat].filter((c) => c !== card);
+  d.trick.push({ seat, card });
+  d.turn = (seat + 1) % 4;
+  demoView();
+}
+
+function demoBots() {
+  const d = demo;
+  if (d.turn === 0 && d.trick.length === 0) return;
+  if (d.trick.length === 4) { demoResolve(); return; }
+  const legal = demoLegal(d.turn);
+  demoPlay(d.turn, legal[Math.floor(Math.random() * legal.length)]);
+  if (d.trick.length === 4) { setTimeout(demoResolve, 900); return; }
+  if (d.turn !== 0) setTimeout(demoBots, 650);
+}
+
+function demoResolve() {
+  const d = demo;
+  const led = suitOf(d.trick[0].card);
+  const trumps = d.trick.filter((p) => suitOf(p.card) === d.trump);
+  const pool = trumps.length ? trumps : d.trick.filter((p) => suitOf(p.card) === led);
+  const win = pool.reduce((a, b) => (rankOf(a.card) >= rankOf(b.card) ? a : b)).seat;
+  d.tricksWon[win]++;
+  d.trick = []; d.trickNo++; d.turn = win;
+  demoView();
+
+  if (d.trickNo === 13) {
+    const made = d.tricksWon[0] + d.tricksWon[2] >= d.highBid;
+    toast(
+      `<h3>El bitti</h3><div class="big">${d.tricksWon[0] + d.tricksWon[2]}</div>` +
+      `<p>Taahhüt ${d.highBid} · ${made ? "tuttu" : "battı"}</p>` +
+      `<p>Deneme masası burada biter.</p>`
+    );
+    return;
+  }
+  if (d.turn !== 0) setTimeout(demoBots, 700);
+}
+
+/* ------------------------------------------------- açılış */
+
+$("sit").addEventListener("click", connect);
+$("demo").addEventListener("click", demoStart);
+
+// Sunucuya bagli degilken deneme dusmesi one cikar
+fetch("/health").then((r) => {
+  if (!r.ok) throw new Error();
+}).catch(() => {
+  $("lobbytext").textContent =
+    "Oyun sunucusuna ulaşılamıyor. Arayüzü deneme masasında inceleyebilirsiniz.";
+});
+</script>
+</body>
+</html>
