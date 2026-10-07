@@ -116,6 +116,7 @@ select:focus-visible{outline:2px solid var(--esli); outline-offset:2px}
   border:1px solid var(--line); border-radius:4px; padding:7px 10px; font:inherit;
 }
 .rmv{
+  margin-top:5px; display:inline-block;
   background:transparent; border:1px solid var(--line); color:var(--muted);
   border-radius:4px; padding:5px 9px; font-size:12.5px;
 }
@@ -338,7 +339,7 @@ function renderRegions(){
       draft.regions.splice(i,1);
       renderRegions(); refresh();
     });
-    r.querySelector("div").appendChild(rm);
+    r.firstElementChild.appendChild(rm);
     box.appendChild(r);
   });
 }
@@ -362,6 +363,9 @@ function addRegion(){
 }
 
 function render(){
+  renderGames();
+  renderRegions();
+
   // açık varyantlar
   const en=$("enabled"); en.innerHTML="";
   for(const id of Object.keys(VLABEL)){
