@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Batak — Muhabbetly</title>
+<title>Kahveden Batak</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap" rel="stylesheet">
@@ -43,7 +43,14 @@ body{
 .trump[hidden]{display:none}
 .trump b{font-size:17px; line-height:1}
 .bar .right{margin-left:auto; display:flex; gap:16px; align-items:center; flex:none}
-#score{color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+#score{
+  display:inline-flex; gap:6px; align-items:center;
+  color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+#score b{
+  color:var(--bone); font-weight:600; background:rgba(255,255,255,.06);
+  border-radius:999px; padding:2px 8px;
+}
 .conn{display:inline-flex; align-items:center; gap:6px; color:var(--muted)}
 .dot{width:7px; height:7px; border-radius:50%; background:var(--dim)}
 .dot.on{background:var(--ok)}
@@ -59,23 +66,42 @@ body{
    Genis ekranda masa bos bir alana donusmesin. */
 .table{
   position:relative;
-  width:min(560px, 100%); height:min(100%, 400px);
-  border-radius:50% / 42%;
-  background:radial-gradient(ellipse 72% 66% at 50% 46%, var(--felt-hi), var(--felt) 72%);
+  width:min(760px, 100%); height:min(100%, 520px);
+  border-radius:50% / 40%;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 42%, rgba(255,255,255,.045), transparent 70%),
+    radial-gradient(ellipse 74% 68% at 50% 48%, var(--felt-hi), var(--felt) 74%);
   border:3px solid var(--rail);
-  box-shadow:inset 0 0 44px rgba(0,0,0,.42), 0 10px 34px rgba(0,0,0,.4);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.08),
+    inset 0 0 56px rgba(0,0,0,.45),
+    0 14px 40px rgba(0,0,0,.45);
 }
 @media (max-height:560px){ .table{ height:100% } }
 
 /* oyuncu etiketleri */
 .seat{
-  position:absolute; display:flex; flex-direction:column; gap:3px;
-  padding:7px 11px; border-radius:7px; background:rgba(10,20,24,.5);
-  border:1px solid transparent; min-width:92px; font-size:12.5px;
+  position:absolute; display:grid;
+  grid-template-columns:auto 1fr; grid-template-rows:auto auto auto;
+  column-gap:9px; row-gap:2px; align-items:center;
+  padding:7px 13px 7px 8px; border-radius:999px;
+  background:rgba(9,18,22,.72); backdrop-filter:blur(3px);
+  border:1px solid rgba(255,255,255,.07); min-width:112px; font-size:12.5px;
+  transition:border-color .18s ease, box-shadow .18s ease;
 }
-.seat.active{border-color:var(--live); background:rgba(217,164,65,.14)}
-.seat.me{background:rgba(10,20,24,.65)}
-.seat .nm{font-weight:600; display:flex; align-items:center; gap:6px}
+.seat .av{
+  grid-row:1 / span 2; width:30px; height:30px; border-radius:50%;
+  display:grid; place-items:center; font-weight:700; font-size:13px;
+  background:linear-gradient(160deg,#2f5661,#1f3d46); color:var(--bone);
+  border:1px solid rgba(255,255,255,.12);
+}
+.seat.active{
+  border-color:var(--live);
+  box-shadow:0 0 0 3px rgba(217,164,65,.16), 0 4px 14px rgba(0,0,0,.35);
+}
+.seat.active .av{background:linear-gradient(160deg,#a97f33,#7a5a22); border-color:var(--rail-hi)}
+.seat.me .av{background:linear-gradient(160deg,#3a6b5c,#24473d)}
+.seat .nm{font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap}
 .seat .st{color:var(--muted); font-size:11.5px; display:flex; gap:7px}
 .seat .tag{color:var(--live)}
 .seat .tag.off{color:var(--bad)}
@@ -85,7 +111,8 @@ body{
 .seat.s3{right:2%;   top:50%;  transform:translateY(-50%)}
 
 /* süre halkası */
-.ring{width:100%; height:3px; border-radius:2px; background:rgba(255,255,255,.12); overflow:hidden}
+.ring{grid-column:1 / -1; width:100%; height:3px; border-radius:2px;
+  background:rgba(255,255,255,.1); overflow:hidden; margin-top:3px}
 .ring i{display:block; height:100%; background:var(--live); width:100%}
 
 /* orta — oynanan tur */
@@ -131,11 +158,23 @@ body{
 
 /* ---------- elim ---------- */
 .hand{
-  min-height:calc(var(--card-w)*1.4 + 20px); align-items:center;
-  padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px));
-  background:var(--ink); border-top:1px solid #27454d;
-  display:flex; justify-content:center; gap:3px; overflow-x:auto;
+  position:relative;
+  min-height:calc(var(--card-w)*1.4 + 26px); align-items:flex-end;
+  padding:14px 12px calc(14px + env(safe-area-inset-bottom,0px));
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.22), transparent 42%),
+    var(--ink);
+  border-top:1px solid #27454d;
+  display:flex; justify-content:center; gap:2px; overflow-x:auto;
   scrollbar-width:none;
+}
+/* Istaka: kartlarin oturdugu pirinc cizgi */
+.hand::after{
+  content:""; position:absolute; left:50%; transform:translateX(-50%);
+  bottom:calc(9px + env(safe-area-inset-bottom,0px));
+  width:min(92%, 760px); height:3px; border-radius:2px;
+  background:linear-gradient(90deg, transparent, var(--rail) 12%, var(--rail-hi) 50%, var(--rail) 88%, transparent);
+  opacity:.65; pointer-events:none;
 }
 .hand::-webkit-scrollbar{display:none}
 .hand .card{cursor:default; transition:transform .12s ease, opacity .12s ease}
@@ -163,38 +202,91 @@ button:disabled{opacity:.4; cursor:not-allowed}
 button.primary{background:var(--bone); color:var(--ink); border-color:var(--bone); font-weight:600}
 button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 
-/* ---------- giriş ekranı ---------- */
+/* ---------- giriş ekranı: solda tanıtım, sağda giriş ---------- */
 .lobby{
-  position:absolute; inset:0; display:grid; place-items:center;
-  background:var(--ink); z-index:10; padding:24px; text-align:center;
+  position:absolute; inset:0; z-index:10; overflow-y:auto;
+  background:
+    radial-gradient(ellipse 52% 40% at 22% 34%, rgba(74,120,132,.2), transparent 68%),
+    radial-gradient(ellipse 40% 36% at 82% 66%, rgba(217,164,65,.07), transparent 70%),
+    var(--ink);
 }
 .lobby.hide{display:none}
-.lobby h1{
-  margin:0 0 6px; font-size:clamp(28px,7vw,40px); font-weight:700;
-  font-variation-settings:"wdth" 112; letter-spacing:-.02em;
+.split{
+  min-height:100%; display:grid; gap:clamp(28px,5vw,64px);
+  grid-template-columns:1.05fr .95fr; align-items:center;
+  max-width:1040px; margin:0 auto; padding:clamp(24px,5vh,56px) clamp(20px,5vw,40px);
 }
-.lobby p{margin:0 0 22px; color:var(--muted); font-size:14px; max-width:40ch}
+
+/* --- sol: marka ve tanıtım --- */
+.brand{text-align:left}
+.kicker{
+  font-size:clamp(13px,1.6vw,15px); color:var(--rail-hi);
+  font-variation-settings:"wdth" 108; letter-spacing:.14em; margin:0 0 2px;
+}
+.brand h1{
+  margin:0; font-size:clamp(42px,7.5vw,72px); font-weight:700; line-height:.94;
+  font-variation-settings:"wdth" 116; letter-spacing:-.035em;
+}
+.lede{
+  margin:18px 0 26px; color:var(--muted); font-size:clamp(14px,1.7vw,16px);
+  line-height:1.6; max-width:38ch;
+}
+.pitch{list-style:none; margin:0; padding:0; display:grid; gap:13px; max-width:40ch}
+.pitch li{display:grid; grid-template-columns:22px 1fr; gap:11px; align-items:start}
+.pitch .pip{font-size:17px; line-height:1.25; text-align:center}
+.pitch b{display:block; font-weight:600; font-size:14.5px; margin-bottom:1px}
+.pitch span{color:var(--muted); font-size:13px; line-height:1.5}
+
+/* --- sağ: giriş kartı --- */
+.panel{
+  padding:28px 26px 24px; border-radius:16px; text-align:center;
+  background:linear-gradient(180deg, rgba(34,64,73,.55), rgba(22,36,42,.65));
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 20px 54px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.panel h2{
+  margin:0 0 4px; font-size:19px; font-weight:600;
+  font-variation-settings:"wdth" 106;
+}
+.panel p{margin:0 0 18px; color:var(--muted); font-size:13px; line-height:1.5}
 .lobby .row{display:flex; gap:9px; justify-content:center; flex-wrap:wrap}
-.form{display:grid; gap:10px; width:min(300px,86vw); margin:0 auto 16px; text-align:left}
+.form{display:grid; gap:12px; width:100%; margin:0 auto 16px; text-align:left}
 .form label{font-size:12.5px; color:var(--muted); display:block; margin-bottom:4px}
 .form input{
   width:100%; padding:10px 12px; font:inherit; font-size:15px;
-  background:#1e3740; color:var(--bone); border:1px solid #2f535c; border-radius:6px;
+  background:#1b333b; color:var(--bone); border:1px solid #2f535c; border-radius:7px;
 }
 .form input:focus-visible{outline:2px solid var(--live); outline-offset:1px}
 .form .fe{color:var(--bad); font-size:12px; margin-top:3px; min-height:15px}
-.switcher{font-size:13px; color:var(--muted); margin-top:14px}
+.switcher{font-size:13px; color:var(--muted); margin-top:16px}
 .switcher button{
   background:none; border:none; color:var(--live); padding:0 2px;
   text-decoration:underline; font-size:13px; cursor:pointer;
 }
-.hint{font-size:12.5px; color:var(--dim); margin:14px auto 0; max-width:34ch; line-height:1.45}
-.who{display:flex; gap:10px; align-items:center; justify-content:center;
-  font-size:13.5px; color:var(--muted); margin-bottom:16px}
-.who b{color:var(--bone); font-weight:600}
-.chips{color:var(--live); font-variant-numeric:tabular-nums; font-weight:600}
-.err{margin-top:16px; color:var(--bad); font-size:13.5px; min-height:19px}
+.who{
+  display:flex; gap:9px; align-items:center; justify-content:center;
+  flex-wrap:wrap; font-size:14px; color:var(--muted); margin:0 0 20px;
+}
+.who b{color:var(--bone); font-weight:600; font-size:15px}
+.chips{
+  color:var(--live); font-variant-numeric:tabular-nums; font-weight:600;
+  background:rgba(217,164,65,.12); border:1px solid rgba(217,164,65,.25);
+  border-radius:999px; padding:3px 11px; font-size:13px;
+}
+#member .row button{min-width:116px}
+.hint{font-size:12.5px; color:var(--dim); margin:16px auto 0; line-height:1.5}
+.err{margin-top:14px; color:var(--bad); font-size:13px; min-height:18px}
+.legal{
+  margin:22px 0 0; color:var(--dim); font-size:11.5px; line-height:1.5;
+  max-width:40ch;
+}
 
+@media (max-width:860px){
+  .split{grid-template-columns:1fr; gap:26px; padding:26px 20px 34px}
+  .brand{text-align:center}
+  .lede,.pitch,.legal{margin-left:auto; margin-right:auto}
+  .pitch li{text-align:left}
+}
 @media (max-width:420px){
   .seat{min-width:0; padding:5px 8px; font-size:11.5px}
   .felt{padding:8px}
@@ -210,7 +302,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 <div class="app">
 
   <div class="bar">
-    <span class="ttl" id="vname">Batak</span>
+    <span class="ttl" id="vname">Kahveden Batak</span>
     <span class="sep">·</span>
     <span id="handno">—</span>
     <span class="trump" id="trumpbox" hidden><span class="sep">·</span> Koz <b id="trump"></b></span>
@@ -224,21 +316,52 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
    <div class="table" id="table">
     <div class="trick" id="trick"></div>
 
-    <div class="seat s0" data-seat="0"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
-    <div class="seat s1" data-seat="1"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
-    <div class="seat s2" data-seat="2"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
-    <div class="seat s3" data-seat="3"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s0" data-seat="0"><div class="av"></div><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s1" data-seat="1"><div class="av"></div><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s2" data-seat="2"><div class="av"></div><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
+    <div class="seat s3" data-seat="3"><div class="av"></div><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
 
     <div class="toast" id="toast"></div>
    </div>
 
     <div class="lobby" id="lobby">
-      <div>
-        <h1>Batak</h1>
+     <div class="split">
 
-        <!-- giris / kayit -->
+      <div class="brand">
+        <p class="kicker">Kahveden</p>
+        <h1>Batak</h1>
+        <p class="lede">
+          Dört kişilik masa, ihale, koz, batma. Kahvede oynadığınız oyunun
+          aynısı — jeton bedava, para yok.
+        </p>
+        <ul class="pitch">
+          <li>
+            <span class="pip" style="color:var(--spade-d)">&#9824;</span>
+            <div><b>Eşli Batak</b><span>Karşınızdaki eşiniz. İhaleyi alan kozu seçer, takım tutturamazsa batar.</span></div>
+          </li>
+          <li>
+            <span class="pip" style="color:var(--heart-d)">&#9829;</span>
+            <div><b>Dağıtım doğrulanabilir</b><span>El başında karıştırmanın özeti yayımlanır, el sonunda açıklanır. Dilerseniz kendiniz hesaplayın.</span></div>
+          </li>
+          <li>
+            <span class="pip" style="color:var(--diamond-d)">&#9830;</span>
+            <div><b>Beklemek yok</b><span>Alıştırma masasında otuz saniyede dolmazsa boş koltukları bot alır.</span></div>
+          </li>
+          <li>
+            <span class="pip" style="color:var(--club-d)">&#9827;</span>
+            <div><b>Bağlantınız koparsa</b><span>Doksan saniye yeriniz durur. Dönemezseniz elinizi bot oynar, masa dağılmaz.</span></div>
+          </li>
+        </ul>
+        <p class="legal">
+          Jetonlar yalnızca oyun içindir; paraya veya mala çevrilmez,
+          hesaplar arasında aktarılamaz. 18 yaş ve üzeri içindir.
+        </p>
+      </div>
+
+      <div class="panel">
         <div id="guest">
-          <p id="lobbytext">Oynamak için giriş yapın. Hesabınız yoksa birkaç saniyede açılır.</p>
+          <h2 id="panelTitle">Giriş yapın</h2>
+          <p id="lobbytext">Hesabınız yoksa birkaç saniyede açılır.</p>
           <div class="form">
             <div>
               <label for="u">Kullanıcı adı</label>
@@ -260,8 +383,8 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
           </div>
         </div>
 
-        <!-- giris yapmis -->
         <div id="member" hidden>
+          <h2>Masa hazır</h2>
           <div class="who">
             <span><b id="meName"></b></span>
             <span class="chips" id="meChips"></span>
@@ -274,14 +397,16 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
             <button id="bonus">Günlük bonus</button>
             <button id="out">Çıkış</button>
           </div>
-          <p class="hint" id="hint">
-            Alıştırma masasında bahis yoktur; 30 saniyede dolmazsa boş
-            koltukları bot alır.
+          <p class="hint">
+            Alıştırma masasında bahis yoktur; otuz saniyede dolmazsa
+            boş koltukları bot alır.
           </p>
         </div>
 
         <div class="err" id="lobbyerr"></div>
       </div>
+
+     </div>
     </div>
   </div>
 
@@ -352,8 +477,12 @@ function render() {
     const b = $("trump"); b.textContent = s.g; b.style.color = s.d;
   } else tb.hidden = true;
 
-  $("score").textContent = view.scores
-    ? view.scores.map((v, i) => (i === mySeat ? `siz ${v}` : String(v))).join(" \u00b7 ")
+  // Esli varyantta takim puani; digerlerinde kendi puaniniz one cikar.
+  $("score").innerHTML = view.scores
+    ? `<span>Puan</span><b>${view.scores[mySeat ?? 0]}</b>` +
+      `<span>${view.scores
+        .filter((_, i) => i !== (mySeat ?? 0))
+        .join(" \u00b7 ")}</span>`
     : "";
 
   // koltuklar — kendi koltugum daima altta gorunur
@@ -362,7 +491,11 @@ function render() {
     const node = document.querySelector(`.seat[data-seat="${i}"]`);
     node.className = `seat s${rel}` + (i === mySeat ? " me" : "");
     const s = view.seats[i];
-    node.querySelector(".nm").textContent = s.username || "boş koltuk";
+    const nm = s.username || "boş koltuk";
+    node.querySelector(".nm").textContent = nm;
+    // Bas harf madalyonu: dolu koltukta ad, bos koltukta nokta.
+    node.querySelector(".av").textContent =
+      s.username ? [...s.username][0].toLocaleUpperCase("tr-TR") : "\u00b7";
     const tags = [];
     if (h) tags.push(`${h.tricksWon[i]} tur`);
     if (h && h.bids && h.bids[i] !== null && h.bids[i] !== undefined) tags.push(`teklif ${h.bids[i]}`);
@@ -837,8 +970,9 @@ function setMode(next) {
     ? 'Hesabınız yok mu? <button type="button" id="toggle">Hesap açın</button>'
     : 'Hesabınız var mı? <button type="button" id="toggle">Giriş yapın</button>';
   $("toggle").addEventListener("click", () => setMode(mode === "login" ? "register" : "login"));
+  $("panelTitle").textContent = mode === "login" ? "Giriş yapın" : "Hesap açın";
   $("lobbytext").textContent = mode === "login"
-    ? "Oynamak için giriş yapın. Hesabınız yoksa birkaç saniyede açılır."
+    ? "Hesabınız yoksa birkaç saniyede açılır."
     : "Kullanıcı adı ve parola yeter. Başlangıç jetonunuz hesabınıza yatar.";
   fieldErrors([]);
   $("lobbyerr").textContent = "";
