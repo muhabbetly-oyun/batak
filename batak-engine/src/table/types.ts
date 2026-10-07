@@ -76,6 +76,20 @@ export interface TableState {
   deadline: Deadline | null;
   /** Ust uste iptal edilen el sayisi. 3'te dagitan degisir. */
   consecutiveVoids: number;
+
+  /**
+   * Bos koltuklarin bot ile doldurulacagi an. null = doldurma yok.
+   *
+   * Soguk baslangic sorunu: lansmanda masa dolduracak oyuncu yok, ilk gelen
+   * bos masa gorup gider. Alistirma masasinda 30 saniye sonra botlar oturur.
+   * YALNIZCA bahissiz masalarda; yoksa bota karsi kazanilan jeton ekonomiye
+   * yoktan girer.
+   */
+  botFillAt: number | null;
+  /** Masa bahissiz mi (alistirma). stake === 0 ile ayni, acikca tutulur. */
+  practice: boolean;
+  /** Bos koltuklar kac saniye sonra bota verilsin. Yalnizca alistirmada. */
+  botFillSeconds?: number;
 }
 
 export type TableInput =

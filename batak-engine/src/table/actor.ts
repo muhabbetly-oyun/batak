@@ -12,6 +12,9 @@ import {
 } from "./types.js";
 
 const next = (s: Seat): Seat => ((s + 1) % 4) as Seat;
+
+/** Bot oyuncu adlari. Gercek oyunculardan ayirt edilebilsin diye sade. */
+const BOT_NAMES = ["Bot Ayse", "Bot Mehmet", "Bot Zeynep", "Bot Kerem"];
 const emptySeat = (): SeatState => ({
   userId: null, username: null, disconnected: false,
   disconnectedAt: null, bot: false, abandons: 0,
@@ -24,10 +27,15 @@ export interface CreateTableOptions {
   stake: number;
   roomId?: string | null;
   timers?: Partial<Timers>;
+  /**
+   * Bos koltuklar kac saniye sonra bota verilsin. 0 = asla.
+   * Bahisli masada yok sayilir.
+   */
+  botFillSeconds?: number;
 }
 
 export function createTable(o: CreateTableOptions): TableState {
-  return {
+  const base: TableState = {
     tableId: o.tableId,
     // Ayarin KOPYASI. Panelden degisse bile bu masa kendi kurallariyla biter.
     variant: { ...o.variant },
@@ -45,7 +53,15 @@ export function createTable(o: CreateTableOptions): TableState {
     seed: null,
     deadline: null,
     consecutiveVoids: 0,
+    botFillAt: null,
+    // Bahissiz masa = alistirma. Bot doldurma yalnizca burada calisir.
+    practice: o.stake === 0,
   };
+  // botFillSeconds yalnizca alistirma masasinda anlamli.
+  if (base.practice && (o.botFillSeconds ?? 0) > 0) {
+    base.botFillSeconds = o.botFillSeconds!;
+  }
+  return base;
 }
 
 /**
@@ -78,7 +94,15 @@ export function step(
         userId: input.userId, username: input.username,
       });
       if (s.phase === "waiting" && s.seats.every((x) => x.userId !== null)) {
+        s.botFillAt = null;
         startNextHand(s, events, effects, input.now, seedFn);
+      } else if (s.phase === "waiting" && s.practice && s.botFillAt === null) {
+        // Alistirma masasi: ilk oyuncu oturdu, sayac basladi.
+        const secs = s.botFillSeconds ?? 0;
+        if (secs > 0) {
+          s.botFillAt = input.now + secs * 1000;
+          effects.push({ kind: "schedule", at: s.botFillAt });
+        }
       }
       break;
     }
@@ -178,14 +202,42 @@ function applyTick(
     }
   }
 
-  // 2) El sonu beklemesi bittiyse sonraki eli bas.
+  // 2) Alistirma masasi: sayac dolduysa bos koltuklari bot alsin.
+  if (
+    s.phase === "waiting" && s.practice &&
+    s.botFillAt !== null && now >= s.botFillAt
+  ) {
+    s.botFillAt = null;
+    let n = 0;
+    for (const i of [0, 1, 2, 3] as Seat[]) {
+      if (s.seats[i].userId !== null) continue;
+      s.seats[i] = {
+        ...emptySeat(),
+        userId: `bot:${s.tableId}:${i}`,
+        username: BOT_NAMES[n % BOT_NAMES.length],
+        bot: true,
+      };
+      events.push({
+        type: "seat_taken", seat: i,
+        userId: s.seats[i].userId!, username: s.seats[i].username!,
+      });
+      events.push({ type: "bot_took_over", seat: i });
+      n++;
+    }
+    if (s.seats.every((x) => x.userId !== null)) {
+      startNextHand(s, events, effects, now, seedFn);
+      return;
+    }
+  }
+
+  // 3) El sonu beklemesi bittiyse sonraki eli bas.
   if (s.phase === "handEnd" && s.deadline && now >= s.deadline.at) {
     s.deadline = null;
     startNextHand(s, events, effects, now, seedFn);
     return;
   }
 
-  // 3) Hamle suresi dolduysa otomatik hamle yap.
+  // 4) Hamle suresi dolduysa otomatik hamle yap.
   if (s.phase === "playing" && s.deadline && now >= s.deadline.at && s.hand) {
     const seat = s.deadline.seat;
     events.push({ type: "player_timeout", seat, kind: s.deadline.kind });
@@ -250,13 +302,17 @@ function startNextHand(
   s.phase = "playing";
   events.push(...he);
 
-  effects.push({
-    kind: "wallet_hold",
-    tableId: s.tableId, handNo: s.handNo,
-    seats: [0, 1, 2, 3],
-    userIds: s.seats.map((x) => x.userId!),
-    amount: s.stake,
-  });
+  // Alistirma masasinda cuzdan hic cagrilmaz: bot koltuklarinin hesabi yok
+  // ve bahissiz elde yazilacak bir sey de yok.
+  if (!s.practice) {
+    effects.push({
+      kind: "wallet_hold",
+      tableId: s.tableId, handNo: s.handNo,
+      seats: [0, 1, 2, 3],
+      userIds: s.seats.map((x) => x.userId!),
+      amount: s.stake,
+    });
+  }
 
   setDeadline(s, now);
 }
@@ -270,11 +326,13 @@ function afterHandProgress(
 
   if (s.hand.phase === "voided") {
     // Dort pas: bahis iade, yeniden dagit.
-    effects.push({
-      kind: "wallet_release",
-      tableId: s.tableId, handNo: s.handNo,
-      userIds: s.seats.map((x) => x.userId!), amount: s.stake,
-    });
+    if (!s.practice) {
+      effects.push({
+        kind: "wallet_release",
+        tableId: s.tableId, handNo: s.handNo,
+        userIds: s.seats.map((x) => x.userId!), amount: s.stake,
+      });
+    }
     events.push({ type: "hand_voided_redeal", handNo: s.handNo });
     s.consecutiveVoids++;
     s.handNo--; // ayni el numarasi yeniden denenir
@@ -298,12 +356,14 @@ function afterHandProgress(
     s.scores = addHandScores(s.scores, hs);
     for (const i of [0, 1, 2, 3] as Seat[]) if (hs[i] < 0) s.timesSet[i]++;
 
-    effects.push({
-      kind: "wallet_settle",
-      tableId: s.tableId, handNo: s.handNo,
-      userIds: s.seats.map((x) => x.userId!),
-      deltas: hs.map((p) => p * s.stake),
-    });
+    if (!s.practice) {
+      effects.push({
+        kind: "wallet_settle",
+        tableId: s.tableId, handNo: s.handNo,
+        userIds: s.seats.map((x) => x.userId!),
+        deltas: hs.map((p) => p * s.stake),
+      });
+    }
 
     s.consecutiveVoids = 0;
 
@@ -344,6 +404,8 @@ export function viewFor(s: TableState, seat: Seat | null): unknown {
     scores: s.scores,
     dealer: s.dealer,
     deadline: s.deadline,
+    practice: s.practice,
+    botFillAt: s.botFillAt,
     seats: s.seats.map((x, i) => ({
       seat: i, username: x.username,
       disconnected: x.disconnected, bot: x.bot,

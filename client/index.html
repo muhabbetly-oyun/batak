@@ -188,6 +188,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
   background:none; border:none; color:var(--live); padding:0 2px;
   text-decoration:underline; font-size:13px; cursor:pointer;
 }
+.hint{font-size:12.5px; color:var(--dim); margin:14px auto 0; max-width:34ch; line-height:1.45}
 .who{display:flex; gap:10px; align-items:center; justify-content:center;
   font-size:13.5px; color:var(--muted); margin-bottom:16px}
 .who b{color:var(--bone); font-weight:600}
@@ -267,9 +268,16 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
           </div>
           <div class="row">
             <button class="primary" id="sit">Masaya otur</button>
+            <button id="sitPractice">Alıştırma masası</button>
+          </div>
+          <div class="row" style="margin-top:9px">
             <button id="bonus">Günlük bonus</button>
             <button id="out">Çıkış</button>
           </div>
+          <p class="hint" id="hint">
+            Alıştırma masasında bahis yoktur; 30 saniyede dolmazsa boş
+            koltukları bot alır.
+          </p>
         </div>
 
         <div class="err" id="lobbyerr"></div>
@@ -502,7 +510,7 @@ function send(msg) {
 
 const play = (card) => send({ type: "play", card });
 
-async function connect() {
+async function connect(practice) {
   $("lobbyerr").textContent = "";
   setConn("", "bağlanıyor…");
   const token = await freshToken();
@@ -515,7 +523,11 @@ async function connect() {
 
   ws.onopen = () => {
     setConn("on", "bağlı");
-    send({ type: "join", variantId: "esli", roomId: new URLSearchParams(location.search).get("oda") });
+    send({
+      type: "join", variantId: "esli",
+      practice: practice === true,
+      roomId: new URLSearchParams(location.search).get("oda"),
+    });
   };
 
   ws.onmessage = (ev) => {
@@ -547,7 +559,15 @@ function onServer(m) {
       render();
       if (view.phase === "waiting") {
         const n = view.seats.filter((s) => s.username).length;
-        toast(`<h3>Oyuncu bekleniyor</h3><p>${n} / 4 kişi masada.</p>`);
+        const left = view.botFillAt
+          ? Math.max(0, Math.ceil((view.botFillAt - Date.now()) / 1000))
+          : null;
+        toast(
+          `<h3>Oyuncu bekleniyor</h3><p>${n} / 4 kişi masada.</p>` +
+          (left !== null
+            ? `<p>${left} saniye içinde dolmazsa botlar oturacak.</p>`
+            : "")
+        );
       }
       if (view.phase === "finished") showResult();
       break;
@@ -848,7 +868,8 @@ async function logout() {
 
 /* ------------------------------------------------- açılış */
 
-$("sit").addEventListener("click", connect);
+$("sit").addEventListener("click", () => connect(false));
+$("sitPractice").addEventListener("click", () => connect(true));
 $("demo").addEventListener("click", demoStart);
 $("go").addEventListener("click", submitAuth);
 $("bonus").addEventListener("click", claimBonus);

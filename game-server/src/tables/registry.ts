@@ -16,6 +16,8 @@ export interface JoinRequest {
   userId: string;
   username: string;
   variantId: string;
+  /** Alistirma masasi: bahis yok, bos koltuklari bot alir. */
+  practice?: boolean;
   /** Sohbet odasindan geldiyse: ayni odadaki masaya oturtulur. */
   roomId?: string | null;
   /** Arkadasla gel: bu masaya oturmak istiyor. */
@@ -39,7 +41,7 @@ export class TableRegistry {
   get(tableId: string): TableRunner | undefined { return this.tables.get(tableId); }
 
   list(): Array<{
-    tableId: string; variant: string; phase: string;
+    tableId: string; variant: string; phase: string; practice: boolean;
     handNo: number; players: number; bots: number; roomId: string | null;
   }> {
     return [...this.tables.values()].map((r) => {
@@ -48,6 +50,7 @@ export class TableRegistry {
         tableId: s.tableId,
         variant: s.variant.id,
         phase: s.phase,
+        practice: s.practice,
         handNo: s.handNo,
         players: s.seats.filter((x) => x.userId !== null).length,
         bots: s.seats.filter((x) => x.bot).length,
@@ -74,11 +77,14 @@ export class TableRegistry {
       return { ok: false, code: "VARIANT_CLOSED", message: "Bu oyun su an kapali." };
     }
 
-    // Once ayni odadaki bekleyen masa, sonra herhangi bir bekleyen masa
+    // Alistirma ve gercek masalar ayri havuzlardir: bahissiz oyuncu
+    // bahisli masaya dusmemeli, tersi de.
+    const wantPractice = req.practice === true;
     const open = [...this.tables.values()].filter((r) => {
       const s = r.snapshot;
       return s.phase === "waiting"
         && s.variant.id === req.variantId
+        && s.practice === wantPractice
         && s.seats.some((x) => x.userId === null);
     });
     const preferred = req.roomId
@@ -86,10 +92,14 @@ export class TableRegistry {
       : open[0];
 
     if (preferred) return this.sit(preferred, req);
-    return this.sit(this.create(req.variantId, req.roomId ?? null), req);
+    return this.sit(
+      this.create(req.variantId, req.roomId ?? null, wantPractice), req,
+    );
   }
 
-  private create(variantId: string, roomId: string | null): TableRunner {
+  private create(
+    variantId: string, roomId: string | null, practice: boolean,
+  ): TableRunner {
     const cfg = this.getConfig();
     const state: TableState = createTable({
       tableId: randomUUID(),
@@ -97,8 +107,11 @@ export class TableRegistry {
       // kendi kurallariyla biter.
       variant: cfg.variants[variantId],
       timers: cfg.timers,
-      endCondition: { kind: "fixedHands", value: 4 },
-      stake: cfg.stakes[variantId] ?? 0,
+      endCondition: { kind: "fixedHands", value: practice ? 2 : 4 },
+      // Alistirma masasi bahissizdir; bota karsi kazanilan jeton ekonomiye
+      // yoktan girmesin.
+      stake: practice ? 0 : (cfg.stakes[variantId] ?? 0),
+      botFillSeconds: practice ? 30 : 0,
       roomId,
     });
     const runner = new TableRunner(state, this.deps);

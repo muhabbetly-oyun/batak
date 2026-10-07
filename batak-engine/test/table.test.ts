@@ -258,3 +258,108 @@ test("step girdiyi degistirmez", () => {
   step(s, { type: "tick", now: T0 + 1 }, seedFn);
   assert.equal(JSON.stringify(s), before);
 });
+
+// ------------------------------------------------------------- bot masasi
+
+const practice = (secs = 30) => createTable({
+  tableId: "p1", variant: IHALELI_BATAK,
+  endCondition: { kind: "fixedHands", value: 2 },
+  stake: 0, botFillSeconds: secs,
+});
+
+test("bahissiz masa alistirma olarak isaretlenir", () => {
+  assert.equal(practice().practice, true);
+  const paid = createTable({
+    tableId: "x", variant: IHALELI_BATAK,
+    endCondition: { kind: "fixedHands", value: 2 }, stake: 100,
+  });
+  assert.equal(paid.practice, false);
+});
+
+test("ilk oyuncu oturunca bot sayaci baslar", () => {
+  const r = step(practice(30), {
+    type: "join", seat: 0, userId: "u0", username: "Siz", now: T0,
+  }, seedFn);
+  assert.equal(r.state.botFillAt, T0 + 30_000);
+  assert.ok(r.effects.some((e) => e.kind === "schedule"));
+});
+
+test("sayac dolunca bos koltuklari bot alir ve el baslar", () => {
+  let s = step(practice(30), {
+    type: "join", seat: 0, userId: "u0", username: "Siz", now: T0,
+  }, seedFn).state;
+  assert.equal(s.phase, "waiting");
+
+  const r = step(s, { type: "tick", now: T0 + 31_000 }, seedFn);
+  assert.equal(r.state.phase, "playing", "el baslamadi");
+  assert.equal(r.state.seats.filter((x) => x.bot).length, 3);
+  assert.equal(r.state.seats[0].bot, false, "insan oyuncu bota cevrildi");
+  assert.equal(r.state.botFillAt, null);
+});
+
+test("sayac dolmadan bot oturmaz", () => {
+  let s = step(practice(30), {
+    type: "join", seat: 0, userId: "u0", username: "Siz", now: T0,
+  }, seedFn).state;
+  const r = step(s, { type: "tick", now: T0 + 29_000 }, seedFn);
+  assert.equal(r.state.phase, "waiting");
+  assert.equal(r.state.seats.filter((x) => x.bot).length, 0);
+});
+
+test("masa insanlarla dolarsa bot beklenmez", () => {
+  let s = practice(30);
+  for (const i of [0, 1, 2, 3] as Seat[]) {
+    s = step(s, {
+      type: "join", seat: i, userId: `u${i}`, username: `O${i}`, now: T0,
+    }, seedFn).state;
+  }
+  assert.equal(s.phase, "playing");
+  assert.equal(s.botFillAt, null);
+  assert.equal(s.seats.filter((x) => x.bot).length, 0);
+});
+
+test("alistirma masasi cuzdana HIC dokunmaz", () => {
+  let s = practice(30);
+  let all: string[] = [];
+  const push = (r: ReturnType<typeof step>) => {
+    all.push(...r.effects.map((e) => e.kind));
+    return r.state;
+  };
+  s = push(step(s, { type: "join", seat: 0, userId: "u0", username: "Siz", now: T0 }, seedFn));
+  s = push(step(s, { type: "tick", now: T0 + 31_000 }, seedFn));
+
+  let now = T0 + 31_000;
+  for (let i = 0; i < 600 && s.phase !== "finished"; i++) {
+    now = s.deadline ? s.deadline.at + 1 : now + 1000;
+    s = push(step(s, { type: "tick", now }, seedFn));
+  }
+  assert.equal(s.phase, "finished", "masa bitmedi");
+  const wallet = all.filter((k) => k.startsWith("wallet_"));
+  assert.deepEqual(wallet, [], `cuzdan cagrildi: ${wallet.join(",")}`);
+});
+
+test("bahisli masada bot doldurma calismaz", () => {
+  const paid = createTable({
+    tableId: "x", variant: IHALELI_BATAK,
+    endCondition: { kind: "fixedHands", value: 2 },
+    stake: 100, botFillSeconds: 30,
+  });
+  const s = step(paid, {
+    type: "join", seat: 0, userId: "u0", username: "Siz", now: T0,
+  }, seedFn).state;
+  assert.equal(s.botFillAt, null, "bahisli masada bot sayaci baslatildi");
+
+  const r = step(s, { type: "tick", now: T0 + 60_000 }, seedFn);
+  assert.equal(r.state.phase, "waiting");
+  assert.equal(r.state.seats.filter((x) => x.bot).length, 0);
+});
+
+test("botlarla dolan masa sonuna kadar oynanir", () => {
+  let s = step(practice(30), {
+    type: "join", seat: 0, userId: "u0", username: "Siz", now: T0,
+  }, seedFn).state;
+  s = step(s, { type: "tick", now: T0 + 31_000 }, seedFn).state;
+  const done = runTable(s, 2000);
+  assert.equal(done.phase, "finished");
+  assert.equal(done.handNo, 2);
+});
