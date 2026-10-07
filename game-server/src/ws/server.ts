@@ -56,7 +56,7 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       const s = ws as Session;
       s.userId = who.userId;
       s.username = who.username;
-      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? null ?? undefined;
+      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? undefined;
 
       // Ayni oyuncunun eski baglantisi varsa kapat: tek baglanti kurali
       // coklu sekme ile ayni masada iki kez oynamayi engeller.
