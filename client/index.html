@@ -42,7 +42,8 @@ body{
 .trump{display:inline-flex; align-items:center; gap:5px}
 .trump[hidden]{display:none}
 .trump b{font-size:17px; line-height:1}
-.bar .right{margin-left:auto; display:flex; gap:12px; align-items:center}
+.bar .right{margin-left:auto; display:flex; gap:16px; align-items:center; flex:none}
+#score{color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
 .conn{display:inline-flex; align-items:center; gap:6px; color:var(--muted)}
 .dot{width:7px; height:7px; border-radius:50%; background:var(--dim)}
 .dot.on{background:var(--ok)}
@@ -130,6 +131,7 @@ body{
 
 /* ---------- elim ---------- */
 .hand{
+  min-height:calc(var(--card-w)*1.4 + 20px); align-items:center;
   padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px));
   background:var(--ink); border-top:1px solid #27454d;
   display:flex; justify-content:center; gap:3px; overflow-x:auto;
@@ -143,6 +145,7 @@ body{
 .hand .card.legal:focus-visible{box-shadow:0 0 0 2px var(--live)}
 
 /* ---------- eylem çubuğu ---------- */
+.acts .wait{width:100%; text-align:center; font-size:13px; color:var(--dim)}
 .acts{
   padding:10px 12px; background:var(--ink); border-top:1px solid #27454d;
   display:none; gap:7px; flex-wrap:wrap; align-items:center; justify-content:center;
@@ -359,7 +362,20 @@ function renderHand() {
 function renderActions() {
   const a = $("acts"); a.innerHTML = ""; a.classList.remove("show");
   const h = view && view.hand;
-  if (!h || h.turn !== mySeat || view.phase !== "playing") return;
+
+  // Sira bizde degilse veya el bittiyse: alt alan comelmesin, kisa durum yaz.
+  if (!h || h.turn !== mySeat || view.phase !== "playing") {
+    a.classList.add("show");
+    const w = el("div", "wait");
+    w.textContent =
+      !h ? "Masa hazirlaniyor."
+      : view.phase === "finished" ? "Oyun bitti."
+      : h.phase === "ended" ? "El bitti, siradaki el baslayacak."
+      : `Sira ${view.seats[h.turn] && view.seats[h.turn].username
+            ? view.seats[h.turn].username : "digerinde"}.`;
+    a.appendChild(w);
+    return;
+  }
 
   if (h.phase === "bidding") {
     a.classList.add("show");
