@@ -9,7 +9,7 @@ import type { Move, Seat, Suit } from "@muhabbetly/batak-engine";
  */
 
 export type ClientMessage =
-  | { type: "join"; variantId: string; practice?: boolean; roomId?: string | null; tableId?: string | null }
+  | { type: "join"; variantId: string; practice?: boolean; region?: string | null; roomId?: string | null; tableId?: string | null }
   | { type: "leave" }
   | { type: "bid"; value: number }
   | { type: "pass" }
@@ -45,13 +45,15 @@ export function parse(raw: string): ParseResult {
       if (typeof v.variantId !== "string" || !VARIANT_IDS.has(v.variantId)) {
         return { ok: false, code: "BAD_VARIANT", message: "Bilinmeyen oyun." };
       }
+      const region = typeof v.region === "string" && /^[a-z0-9-]{2,24}$/.test(v.region)
+        ? v.region : null;
       const roomId = typeof v.roomId === "string" ? v.roomId.slice(0, 64) : null;
       const tableId = typeof v.tableId === "string" ? v.tableId.slice(0, 64) : null;
       return {
         ok: true,
         msg: {
           type: "join", variantId: v.variantId,
-          practice: v.practice === true, roomId, tableId,
+          practice: v.practice === true, region, roomId, tableId,
         },
       };
     }

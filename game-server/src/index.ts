@@ -110,6 +110,20 @@ const server = http.createServer(async (req, res) => {
 
   if (await handleAuth(req, res, {
     players, wallet,
+    // Salon listesi: ayardaki acik salonlar + canli oyuncu sayilari.
+    salonlar: () => {
+      const stats = registry.regionStats();
+      return (config.current.regions ?? [])
+        .filter((r) => r.enabled)
+        .map((r) => ({
+          id: r.id, label: r.label,
+          players: stats[r.id]?.players ?? 0,
+          waiting: stats[r.id]?.waiting ?? 0,
+        }))
+        // Kalabalik salon uste: insanlar insana gider, havuz kendiliginden
+        // toplanir.
+        .sort((a, b) => b.players - a.players || a.label.localeCompare(b.label, "tr"));
+    },
     bonus: { amount: num("DAILY_BONUS", 1000), floor: num("BANKRUPT_FLOOR", 500) },
     secure: env("COOKIE_SECURE", "1") === "1",
   })) return;

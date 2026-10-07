@@ -54,7 +54,7 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       const s = ws as Session;
       s.userId = who.userId;
       s.username = who.username;
-      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? undefined;
+      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? null ?? undefined;
 
       // Ayni oyuncunun eski baglantisi varsa kapat: tek baglanti kurali
       // coklu sekme ile ayni masada iki kez oynamayi engeller.
@@ -120,7 +120,7 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       const r = await d.registry.join({
         userId: uid, username: ws.username!,
         variantId: msg.variantId, practice: msg.practice,
-        roomId: msg.roomId, tableId: msg.tableId,
+        region: msg.region, roomId: msg.roomId, tableId: msg.tableId,
       });
       if (!r.ok) { send(ws, { type: "error", code: r.code, message: r.message }); return; }
       send(ws, { type: "joined", tableId: r.tableId, seat: r.seat });

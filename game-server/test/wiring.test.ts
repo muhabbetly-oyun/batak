@@ -268,3 +268,59 @@ test("bulunmayan masaya davet reddedilir", async () => {
   });
   assert.equal(res.ok === false && res.code, "TABLE_NOT_FOUND");
 });
+
+// ------------------------------------------------------------- salonlar
+
+const cfgR = () => {
+  const c = cfg();
+  c.regions = [
+    { id: "genel", label: "Genel salon", enabled: true },
+    { id: "ege", label: "Ege", enabled: true },
+  ];
+  return c;
+};
+
+test("ayni salondan bekleyen masa tercih edilir", async () => {
+  const { deps } = fakeDeps();
+  const r = new TableRegistry(deps as any, cfgR);
+  await r.join({ userId: "a", username: "A", variantId: "esli", region: "ege" });
+  await r.join({ userId: "b", username: "B", variantId: "esli", region: "ege" });
+  const list = r.list();
+  assert.equal(list.length, 1, "ayni salondakiler ayrildi");
+  assert.equal(list[0].region, "ege");
+});
+
+test("salon bos ise baska salondaki masaya oturulur", async () => {
+  const { deps } = fakeDeps();
+  const r = new TableRegistry(deps as any, cfgR);
+  await r.join({ userId: "a", username: "A", variantId: "esli", region: "ege" });
+  // Marmara'dan gelen oyuncu, bekleyen tek masa Ege'de olsa da oraya oturur.
+  const res = await r.join({ userId: "b", username: "B", variantId: "esli", region: "marmara" });
+  assert.equal(res.ok, true);
+  assert.equal(r.list().length, 1, "havuz bolundu — masa dolulugu duser");
+});
+
+test("salon istatistigi insan oyuncuyu sayar, botu saymaz", async () => {
+  const { deps } = fakeDeps();
+  const r = new TableRegistry(deps as any, cfgR);
+  await r.join({ userId: "a", username: "A", variantId: "esli", region: "ege" });
+  await r.join({ userId: "b", username: "B", variantId: "esli", region: "ege" });
+  const st = r.regionStats();
+  assert.equal(st.ege.players, 2);
+  assert.equal(st.ege.waiting, 1);
+});
+
+test("salonsuz katilim genel sayilir", async () => {
+  const { deps } = fakeDeps();
+  const r = new TableRegistry(deps as any, cfgR);
+  await r.join({ userId: "a", username: "A", variantId: "esli" });
+  assert.equal(r.regionStats().genel.players, 1);
+});
+
+test("gecersiz salon kimligi protokolde dusurulur", () => {
+  const bad = parse(JSON.stringify({ type: "join", variantId: "esli", region: "ÇOK UZUN SALON ADI!" }));
+  assert.ok(bad.ok);
+  assert.equal(bad.ok && (bad.msg as any).region, null);
+  const good = parse(JSON.stringify({ type: "join", variantId: "esli", region: "ege" }));
+  assert.equal(good.ok && (good.msg as any).region, "ege");
+});

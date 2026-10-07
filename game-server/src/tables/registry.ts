@@ -18,7 +18,8 @@ export interface JoinRequest {
   variantId: string;
   /** Alistirma masasi: bahis yok, bos koltuklari bot alir. */
   practice?: boolean;
-  /** Sohbet odasindan geldiyse: ayni odadaki masaya oturtulur. */
+  /** Salon. AYRI HAVUZ DEGIL: ayni salondan masa yoksa herhangi birine oturulur. */
+  region?: string | null;
   roomId?: string | null;
   /** Arkadasla gel: bu masaya oturmak istiyor. */
   tableId?: string | null;
@@ -42,7 +43,8 @@ export class TableRegistry {
 
   list(): Array<{
     tableId: string; variant: string; phase: string; practice: boolean;
-    handNo: number; players: number; bots: number; roomId: string | null;
+    handNo: number; players: number; bots: number;
+    roomId: string | null; region: string | null;
   }> {
     return [...this.tables.values()].map((r) => {
       const s = r.snapshot;
@@ -51,6 +53,7 @@ export class TableRegistry {
         variant: s.variant.id,
         phase: s.phase,
         practice: s.practice,
+        region: s.region,
         handNo: s.handNo,
         players: s.seats.filter((x) => x.userId !== null).length,
         bots: s.seats.filter((x) => x.bot).length,
@@ -87,18 +90,24 @@ export class TableRegistry {
         && s.practice === wantPractice
         && s.seats.some((x) => x.userId === null);
     });
-    const preferred = req.roomId
-      ? open.find((r) => r.snapshot.roomId === req.roomId) ?? open[0]
-      : open[0];
+    // Once ayni salon, sonra herhangi bir bekleyen masa.
+    // Salon AYRI HAVUZ OLSAYDI 20 oyuncu 12 salona bolunur, kimse masa
+    // bulamazdi. Tercih olarak tutuyoruz.
+    const preferred =
+      (req.region ? open.find((r) => r.snapshot.region === req.region) : undefined)
+      ?? (req.roomId ? open.find((r) => r.snapshot.roomId === req.roomId) : undefined)
+      ?? open[0];
 
     if (preferred) return this.sit(preferred, req);
     return this.sit(
-      this.create(req.variantId, req.roomId ?? null, wantPractice), req,
+      this.create(req.variantId, req.roomId ?? null, wantPractice, req.region ?? null),
+      req,
     );
   }
 
   private create(
     variantId: string, roomId: string | null, practice: boolean,
+    region: string | null,
   ): TableRunner {
     const cfg = this.getConfig();
     const state: TableState = createTable({
@@ -113,6 +122,7 @@ export class TableRegistry {
       stake: practice ? 0 : (cfg.stakes[variantId] ?? 0),
       botFillSeconds: practice ? 30 : 0,
       roomId,
+      region,
     });
     const runner = new TableRunner(state, this.deps);
     this.tables.set(state.tableId, runner);
@@ -177,6 +187,23 @@ export class TableRegistry {
     if (!r) return null;
     const i = r.snapshot.seats.findIndex((x) => x.userId === userId);
     return i >= 0 ? (i as Seat) : null;
+  }
+
+  /**
+   * Salon basina canlilik. Istemci bunu gosterir: insanlar kalabaliga
+   * gider, bu da dagilmayi kendiliginden engeller.
+   */
+  regionStats(): Record<string, { players: number; tables: number; waiting: number }> {
+    const out: Record<string, { players: number; tables: number; waiting: number }> = {};
+    for (const r of this.tables.values()) {
+      const s = r.snapshot;
+      const key = s.region ?? "genel";
+      const row = out[key] ?? (out[key] = { players: 0, tables: 0, waiting: 0 });
+      row.tables++;
+      row.players += s.seats.filter((x) => x.userId !== null && !x.bot).length;
+      if (s.phase === "waiting") row.waiting++;
+    }
+    return out;
   }
 
   /** Biten masalari bellekten duser. Duzenli cagrilir. */

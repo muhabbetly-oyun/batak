@@ -363,3 +363,12 @@ test("botlarla dolan masa sonuna kadar oynanir", () => {
   assert.equal(done.phase, "finished");
   assert.equal(done.handNo, 2);
 });
+
+test("masa bolgesini saklar", () => {
+  const s = createTable({
+    tableId: "r1", variant: IHALELI_BATAK,
+    endCondition: { kind: "fixedHands", value: 2 },
+    stake: 0, region: "ege",
+  });
+  assert.equal(s.region, "ege");
+});

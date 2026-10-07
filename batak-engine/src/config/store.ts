@@ -9,7 +9,20 @@ import { DEFAULT_TIMERS, type Timers } from "../table/types.js";
  * kopyasi masaya yazilir, boylece oynanan masa degisiklikten etkilenmez.
  */
 
+export interface Region {
+  id: string;
+  label: string;
+  /** Kapali bolgede yeni masa kurulmaz; acik masalar bitene kadar surer. */
+  enabled: boolean;
+}
+
 export interface RuntimeConfig {
+  /**
+   * Salonlar. Bolge AYRI HAVUZ DEGIL, TERCIHTIR: ayni bolgeden bekleyen
+   * masa varsa oraya oturulur, yoksa herhangi bir masaya. Ayri havuz
+   * yapilsaydi 20 oyuncu 12 bolgeye bolunur, kimse masa bulamazdi.
+   */
+  regions: Region[];
   variants: Record<string, VariantConfig>;
   timers: Timers;
   /** Varyant masa kurulumuna acik mi. Lansmanda yalnizca biri acik. */
@@ -20,7 +33,20 @@ export interface RuntimeConfig {
   updatedBy: string | null;
 }
 
+const DEFAULT_REGIONS: Region[] = [
+  { id: "genel",    label: "Genel salon",   enabled: true },
+  { id: "marmara",  label: "Marmara",       enabled: true },
+  { id: "ege",      label: "Ege",           enabled: true },
+  { id: "akdeniz",  label: "Akdeniz",       enabled: true },
+  { id: "icanadolu", label: "İç Anadolu",   enabled: true },
+  { id: "karadeniz", label: "Karadeniz",    enabled: true },
+  { id: "guneydogu", label: "Güneydoğu",    enabled: true },
+  { id: "dogu",     label: "Doğu Anadolu",  enabled: true },
+  { id: "yurtdisi", label: "Yurt dışı",     enabled: true },
+];
+
 export const defaultConfig = (): RuntimeConfig => ({
+  regions: DEFAULT_REGIONS.map((r) => ({ ...r })),
   variants: Object.fromEntries(
     Object.entries(VARIANTS).map(([k, v]) => [k, { ...v }]),
   ),
@@ -79,6 +105,30 @@ export function validate(c: RuntimeConfig): ValidationIssue[] {
     }
   }
 
+  // --- salonlar ---
+  const ids = new Set<string>();
+  for (const r of c.regions ?? []) {
+    if (!/^[a-z0-9-]{2,24}$/.test(r.id)) {
+      out.push({ path: `regions.${r.id}`, message: "Kimlik kucuk harf, rakam ve tire olmali." });
+    }
+    if (!r.label || r.label.length > 30) {
+      out.push({ path: `regions.${r.id}.label`, message: "Ad 1-30 karakter olmali." });
+    }
+    if (ids.has(r.id)) {
+      out.push({ path: `regions.${r.id}`, message: "Ayni kimlik iki kez kullanilmis." });
+    }
+    ids.add(r.id);
+  }
+  if (!(c.regions ?? []).some((r) => r.enabled)) {
+    out.push({ path: "regions", message: "En az bir salon acik olmali." });
+  }
+  if ((c.regions ?? []).filter((r) => r.enabled).length > 14) {
+    out.push({
+      path: "regions",
+      message: "14'ten fazla acik salon masa dolulugunu boler. Once oyuncu sayisi artsin.",
+    });
+  }
+
   const t = c.timers;
   if (t.play < 5_000) out.push({ path: "timers.play", message: "En az 5 sn olmali." });
   if (t.bid < 5_000) out.push({ path: "timers.bid", message: "En az 5 sn olmali." });
@@ -109,6 +159,7 @@ export function merge(current: RuntimeConfig, patch: unknown): RuntimeConfig {
     timers: { ...current.timers },
     enabled: { ...current.enabled },
     stakes: { ...current.stakes },
+    regions: (current.regions ?? []).map((r) => ({ ...r })),
   };
   if (typeof patch !== "object" || patch === null) return next;
   const p = patch as Record<string, any>;
@@ -132,6 +183,21 @@ export function merge(current: RuntimeConfig, patch: unknown): RuntimeConfig {
   if (p.enabled && typeof p.enabled === "object") {
     for (const id of Object.keys(next.enabled)) {
       if (id in p.enabled) next.enabled[id] = Boolean(p.enabled[id]);
+    }
+  }
+  if (Array.isArray(p.regions)) {
+    const seen = new Set<string>();
+    next.regions = [];
+    for (const raw of p.regions) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const id = String(raw.id ?? "").trim().toLowerCase();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      next.regions.push({
+        id,
+        label: String(raw.label ?? id).trim().slice(0, 30),
+        enabled: raw.enabled !== false,
+      });
     }
   }
   if (p.stakes && typeof p.stakes === "object") {

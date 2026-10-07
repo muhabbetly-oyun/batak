@@ -274,6 +274,34 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
   border-radius:999px; padding:3px 11px; font-size:13px;
 }
 #member .row button{min-width:116px}
+
+/* --- salon seçimi --- */
+.salonlar{
+  display:grid; gap:6px; margin:0 0 18px; max-height:216px; overflow-y:auto;
+  text-align:left; scrollbar-width:thin;
+}
+.salon{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  width:100%; padding:9px 13px; border-radius:9px; font:inherit; font-size:14px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+  color:var(--bone); cursor:pointer; text-align:left;
+}
+.salon:hover{background:rgba(255,255,255,.07)}
+.salon[aria-pressed=true]{
+  border-color:var(--live); background:rgba(217,164,65,.13);
+}
+.salon .cnt{
+  font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;
+  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+}
+/* Kalabalık salon öne çıksın: insanlar insana gider. */
+.salon .cnt.live{color:var(--ok)}
+.salon .cnt.live::before{
+  content:""; width:6px; height:6px; border-radius:50%; background:var(--ok);
+}
+.salonlbl{
+  font-size:12.5px; color:var(--muted); text-align:left; margin:0 0 7px;
+}
 .hint{font-size:12.5px; color:var(--dim); margin:16px auto 0; line-height:1.5}
 .err{margin-top:14px; color:var(--bad); font-size:13px; min-height:18px}
 .legal{
@@ -384,11 +412,13 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
         </div>
 
         <div id="member" hidden>
-          <h2>Masa hazır</h2>
+          <h2>Salon seçin</h2>
           <div class="who">
             <span><b id="meName"></b></span>
             <span class="chips" id="meChips"></span>
           </div>
+          <p class="salonlbl">Salonunuzda masa yoksa en yakın dolu masaya oturursunuz.</p>
+          <div class="salonlar" id="salonlar"></div>
           <div class="row">
             <button class="primary" id="sit">Masaya otur</button>
             <button id="sitPractice">Alıştırma masası</button>
@@ -659,6 +689,7 @@ async function connect(practice) {
     send({
       type: "join", variantId: "esli",
       practice: practice === true,
+      region: salon,
       roomId: new URLSearchParams(location.search).get("oda"),
     });
   };
@@ -885,6 +916,7 @@ function showGuest() {
 function showMember() {
   $("guest").hidden = true;
   $("member").hidden = false;
+  void loadSalonlar();
   $("meName").textContent = me.username;
   $("meChips").textContent = `${me.balance.toLocaleString("tr-TR")} jeton`;
 }
@@ -925,6 +957,35 @@ async function refreshSession() {
 async function freshToken() {
   if (accessToken) return accessToken;
   return (await refreshSession()) ? accessToken : null;
+}
+
+let salon = localStorage.getItem("salon") || "genel";
+
+/** Salon listesi ve canlilik. Kalabalik salon yesil nokta ile isaretlenir. */
+async function loadSalonlar() {
+  const box = $("salonlar");
+  const r = await api("/api/salonlar");
+  if (!r.ok || !Array.isArray(r.body)) { box.innerHTML = ""; return; }
+
+  box.innerHTML = "";
+  for (const s of r.body) {
+    const b = el("button", "salon");
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(s.id === salon));
+    const nm = el("span"); nm.textContent = s.label;
+    const cnt = el("span", "cnt" + (s.players > 0 ? " live" : ""));
+    cnt.textContent = s.players > 0
+      ? `${s.players} kişi` + (s.waiting > 0 ? ` · ${s.waiting} masa bekliyor` : "")
+      : "boş";
+    b.append(nm, cnt);
+    b.addEventListener("click", () => {
+      salon = s.id;
+      try { localStorage.setItem("salon", salon); } catch { /* onemsiz */ }
+      for (const x of box.children) x.setAttribute("aria-pressed", "false");
+      b.setAttribute("aria-pressed", "true");
+    });
+    box.appendChild(b);
+  }
 }
 
 async function refreshProfile() {

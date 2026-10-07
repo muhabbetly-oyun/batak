@@ -26,6 +26,7 @@ export interface CreateTableOptions {
   endCondition: EndCondition;
   stake: number;
   roomId?: string | null;
+  region?: string | null;
   timers?: Partial<Timers>;
   /**
    * Bos koltuklar kac saniye sonra bota verilsin. 0 = asla.
@@ -43,6 +44,7 @@ export function createTable(o: CreateTableOptions): TableState {
     endCondition: { ...o.endCondition },
     stake: o.stake,
     roomId: o.roomId ?? null,
+    region: o.region ?? null,
     phase: "waiting",
     seats: [emptySeat(), emptySeat(), emptySeat(), emptySeat()],
     dealer: 3,
@@ -399,6 +401,7 @@ export function viewFor(s: TableState, seat: Seat | null): unknown {
   return {
     tableId: s.tableId,
     variant: s.variant.id,
+    region: s.region,
     phase: s.phase,
     handNo: s.handNo,
     scores: s.scores,

@@ -60,6 +60,8 @@ export interface TableState {
   endCondition: EndCondition;
   stake: number;
   roomId: string | null;
+  /** Salon kimligi. Ayri havuz degil, eslestirme tercihidir. */
+  region: string | null;
 
   phase: TablePhase;
   seats: SeatState[];

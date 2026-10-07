@@ -13,6 +13,8 @@ import type { LocalWallet } from "../wallet/local.js";
 export interface AuthRoutesDeps {
   players: PlayerService;
   wallet: LocalWallet;
+  /** Salon listesi ve canlilik. Istemci giris sonrasi gosterir. */
+  salonlar(): Array<{ id: string; label: string; players: number; waiting: number }>;
   /** Gunluk bonus miktari ve iflas tabani. */
   bonus: { amount: number; floor: number };
   secure: boolean;   // https ise cerez Secure isaretli
@@ -148,6 +150,12 @@ export async function handleAuth(
       const me = await d.players.profile(id);
       if (!me) { json(res, 404, { code: "NOT_FOUND" }); return true; }
       json(res, 200, me);
+      return true;
+    }
+
+    // --- salonlar ---
+    if (p === "/api/salonlar" && req.method === "GET") {
+      json(res, 200, d.salonlar());
       return true;
     }
 
