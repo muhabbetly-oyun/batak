@@ -323,6 +323,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 }
 .form input:focus-visible{outline:2px solid var(--live); outline-offset:1px}
 .form .fe{color:var(--bad); font-size:12px; margin-top:3px; min-height:15px}
+.form .fh{color:var(--dim); font-size:11.5px; margin-top:2px; line-height:1.4}
 .switcher{font-size:13px; color:var(--muted); margin-top:16px}
 .switcher button{
   background:none; border:none; color:var(--live); padding:0 2px;
@@ -556,6 +557,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
               <label for="u">Kullanıcı adı</label>
               <input id="u" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20">
               <div class="fe" id="ue"></div>
+              <div class="fh">E-posta değil — kayıtta seçtiğiniz kullanıcı adı.</div>
             </div>
             <div>
               <label for="pw">Parola</label>
@@ -1264,6 +1266,11 @@ async function submitAuth() {
   $("lobbyerr").textContent = "";
   if (!username || !password) {
     $("lobbyerr").textContent = "Kullanıcı adı ve parola gerekli.";
+    return;
+  }
+  // Loglarda e-posta ile giris denemeleri gorundu: aliskanliktan yaziliyor.
+  if (username.includes("@")) {
+    $("ue").textContent = "Burası e-posta alanı değil, kullanıcı adınızı yazın.";
     return;
   }
 
