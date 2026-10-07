@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist-test",
+    "rootDir": ".",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmitOnError": false,
+    "noImplicitAny": false
+  },
+  "include": [
+    "src/effects/wallet.ts",
+    "src/effects/reverb.ts",
+    "src/ws/protocol.ts",
+    "src/tables/registry.ts",
+    "src/tables/runner.ts",
+    "test/**/*.ts",
+    
+  ]
+}

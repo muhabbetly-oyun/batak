@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Batak kuralları — Muhabbetly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..700;1,62..125,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16242a; --panel:#1d3139; --raise:#24404a; --line:#2e5058;
+  --bone:#e9e3d6; --muted:#8aa2a8; --dim:#5f7d85;
+  --esli:#5b8ae6; --ihaleli:#e0a030; --koz:#d8504b; --gonul:#7fb069;
+  --warn:#e0a030; --bad:#d8504b;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--ink); color:var(--bone);
+  font-family:Archivo,system-ui,"Segoe UI",sans-serif;
+  font-variation-settings:"wdth" 100;
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px; margin:0 auto; padding:0 20px 140px}
+
+/* ---- başlık ---- */
+header{padding:48px 0 28px; border-bottom:1px solid var(--line)}
+h1{
+  margin:0 0 6px; font-size:30px; line-height:1.1; font-weight:600;
+  font-variation-settings:"wdth" 112; letter-spacing:-.015em;
+}
+.sub{margin:0; color:var(--muted); font-size:14px; max-width:58ch}
+.stamp{margin-top:14px; font-size:13px; color:var(--dim)}
+
+/* ---- bölüm ---- */
+section{margin-top:40px}
+h2{
+  margin:0 0 2px; font-size:19px; font-weight:600;
+  font-variation-settings:"wdth" 108; letter-spacing:-.01em;
+}
+.note{margin:0 0 16px; color:var(--muted); font-size:13.5px; max-width:62ch}
+
+/* ---- varyant bloğu ---- */
+.variant{border-left:3px solid var(--spine,var(--line)); padding-left:16px; margin-bottom:26px}
+.variant[data-v=esli]{--spine:var(--esli)}
+.variant[data-v=ihaleli]{--spine:var(--ihaleli)}
+.variant[data-v=koz]{--spine:var(--koz)}
+.variant[data-v=gonul]{--spine:var(--gonul)}
+.vhead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:6px 0 10px}
+.vname{font-size:17px; font-weight:600; font-variation-settings:"wdth" 106}
+.vstate{font-size:12.5px; color:var(--dim)}
+.vstate.on{color:var(--gonul)}
+
+/* ---- satır ---- */
+.row{
+  display:grid; grid-template-columns:1fr 140px; gap:14px; align-items:center;
+  padding:9px 10px 9px 12px; border-bottom:1px solid rgba(46,80,88,.5);
+  margin-left:-12px; border-radius:3px;
+}
+.row:last-of-type{border-bottom:none}
+.row.changed{background:rgba(224,160,48,.09); box-shadow:inset 2px 0 0 var(--warn)}
+.row.invalid{background:rgba(216,80,75,.1); box-shadow:inset 2px 0 0 var(--bad)}
+.rlabel{font-size:14px}
+.rhint{display:block; color:var(--dim); font-size:12.5px; margin-top:1px}
+.was{color:var(--warn); font-size:12.5px; margin-top:2px; display:none}
+.row.changed .was{display:block}
+.err{color:var(--bad); font-size:12.5px; margin-top:2px; display:none}
+.row.invalid .err{display:block}
+
+/* ---- girdi ---- */
+input[type=number]{
+  width:100%; background:var(--panel); color:var(--bone);
+  border:1px solid var(--line); border-radius:4px;
+  padding:7px 10px; font:inherit; font-variant-numeric:tabular-nums;
+  text-align:right;
+}
+input[type=number]:focus-visible,
+.switch:focus-visible,button:focus-visible{
+  outline:2px solid var(--esli); outline-offset:2px;
+}
+.switch{
+  appearance:none; -webkit-appearance:none; cursor:pointer;
+  width:100%; padding:7px 10px; font:inherit; font-size:13.5px;
+  background:var(--panel); color:var(--muted);
+  border:1px solid var(--line); border-radius:4px; text-align:left;
+}
+.switch[aria-pressed=true]{background:var(--raise); color:var(--bone); border-color:var(--spine,var(--esli))}
+.switch::before{content:"kapalı"}
+.switch[aria-pressed=true]::before{content:"açık"}
+
+/* ---- masa listesi ---- */
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{
+  text-align:left; font-weight:600; font-size:12.5px; color:var(--muted);
+  padding:0 10px 8px 0; border-bottom:1px solid var(--line);
+}
+td{padding:9px 10px 9px 0; border-bottom:1px solid rgba(46,80,88,.45); font-variant-numeric:tabular-nums}
+td:last-child,th:last-child{text-align:right; padding-right:0}
+.empty{color:var(--dim); padding:22px 0; font-size:14px}
+
+/* ---- kaydet çubuğu ---- */
+.bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:20;
+  background:rgba(22,36,42,.96); border-top:1px solid var(--line);
+  padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));
+  display:none;
+}
+.bar.show{display:block}
+.barin{
+  max-width:860px; margin:0 auto; display:flex; gap:14px;
+  align-items:center; justify-content:space-between; flex-wrap:wrap;
+}
+.barmsg{font-size:13.5px; color:var(--muted)}
+.barmsg strong{color:var(--bone); font-weight:600}
+.acts{display:flex; gap:10px}
+button{
+  font:inherit; font-size:14px; cursor:pointer; border-radius:4px;
+  padding:9px 18px; border:1px solid var(--line);
+  background:transparent; color:var(--bone);
+}
+button.primary{background:var(--bone); color:var(--ink); border-color:var(--bone); font-weight:600}
+button:disabled{opacity:.45; cursor:not-allowed}
+.banner{
+  margin-top:18px; padding:11px 14px; border-radius:4px; font-size:13.5px;
+  border:1px solid var(--line); background:var(--panel); display:none;
+}
+.banner.show{display:block}
+.banner.bad{border-color:var(--bad); color:#f3bebc}
+.banner.ok{border-color:var(--gonul); color:#cfe6c4}
+@media (max-width:560px){
+  .row{grid-template-columns:1fr 112px; gap:10px}
+  h1{font-size:25px}
+  .wrap{padding:0 16px 150px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .row{transition:background .15s ease}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Batak kuralları</h1>
+  <p class="sub">Buradaki değişiklikler yalnızca <em>yeni kurulan</em> masalara uygulanır. Şu an oynanan masalar kendi kurallarıyla biter.</p>
+  <p class="stamp" id="stamp">Yükleniyor…</p>
+</header>
+
+<div class="banner" id="banner"></div>
+
+<section>
+  <h2>Açık varyantlar</h2>
+  <p class="note">Kapalı varyantta yeni masa kurulamaz. Oyuncuyu bölen her seçenek masa doluluğunu düşürür — bir varyantta ortalama bekleme 30 saniyenin altına inmeden bir sonrakini açmayın.</p>
+  <div id="enabled"></div>
+</section>
+
+<section>
+  <h2>Süreler</h2>
+  <p class="note">Saniye cinsinden. Süre dolunca sunucu otomatik hamle yapar.</p>
+  <div id="timers"></div>
+</section>
+
+<section>
+  <h2>Varyant kuralları</h2>
+  <p class="note">Kural spesifikasyonunda karara bağlanmamış maddeler burada. Beta geri bildirimine göre değiştirin; motor değişmez.</p>
+  <div id="variants"></div>
+</section>
+
+<section>
+  <h2>Açık masalar</h2>
+  <p class="note">Canlı durum. Her 10 saniyede yenilenir.</p>
+  <div id="tables"><p class="empty">Yükleniyor…</p></div>
+</section>
+
+</div>
+
+<div class="bar" id="bar">
+  <div class="barin">
+    <div class="barmsg" id="barmsg"></div>
+    <div class="acts">
+      <button type="button" id="reset">Değişiklikleri geri al</button>
+      <button type="button" id="save" class="primary">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "/admin/api";
+let saved = null;   // sunucudaki hal
+let draft = null;   // ekrandaki hal
+let demo = false;
+
+const VLABEL = {esli:"Eşli Batak", ihaleli:"İhaleli Batak", koz:"Koz Batak", gonul:"Gönül Batağı"};
+const TLABEL = {
+  bid:["Teklif verme","İhalede bir oyuncunun süresi"],
+  trump:["Koz seçme","İhaleyi alanın koz seçme süresi"],
+  play:["Kart oynama","Bir turda bir oyuncunun süresi"],
+  handEnd:["El sonu bekleme","Puanların okunması için"],
+  reconnect:["Yeniden bağlanma","Kopan oyuncunun yeri bu kadar korunur, sonra bot devralır"],
+};
+const RLABEL = {
+  minBid:["En düşük teklif","İhale bu değerin altına inemez"],
+  maxBid:["En yüksek teklif","Normalde 13"],
+  fixedTarget:["Sabit hedef","İhalesiz varyantta herkesin alması gereken tur"],
+  mustPlayTrumpWhenVoid:["Koz oynamak zorunlu","Elinde açılan renk yokken koz varsa oynamak zorunda mı"],
+  contractorScoresActualTricks:["Fazla turlar sayılır","Kapalıysa tutturan yalnızca taahhüdü kadar puan alır"],
+  forceLastBidder:["Son teklifçi açmak zorunda","Kapatmayın: dört pas eli iptal eder, bot masası takılabilir"],
+  slamBonus:["13 turun hepsi ödül","Gönül Batağı'nda bütün turları alan +13 alır"],
+};
+const FIELDS = {
+  esli:["minBid","maxBid","mustPlayTrumpWhenVoid","contractorScoresActualTricks","forceLastBidder"],
+  ihaleli:["minBid","maxBid","mustPlayTrumpWhenVoid","contractorScoresActualTricks","forceLastBidder"],
+  koz:["fixedTarget","mustPlayTrumpWhenVoid"],
+  gonul:["slamBonus"],
+};
+
+const $ = (id) => document.getElementById(id);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const get = (o,p) => p.split(".").reduce((a,k)=>a?.[k], o);
+const set = (o,p,v) => { const k=p.split("."); const last=k.pop();
+  k.reduce((a,x)=>a[x],o)[last]=v; };
+
+function banner(text, kind){
+  const b=$("banner");
+  b.textContent=text; b.className="banner show "+(kind||"");
+  if(kind==="ok") setTimeout(()=>b.className="banner", 4000);
+}
+
+function row(path, label, hint, control){
+  const d=document.createElement("div");
+  d.className="row"; d.dataset.path=path;
+  d.innerHTML=`<div><span class="rlabel">${label}</span>
+    <span class="rhint">${hint}</span>
+    <span class="was"></span><span class="err"></span></div>`;
+  d.appendChild(control);
+  return d;
+}
+
+function numInput(path, scale){
+  const i=document.createElement("input");
+  i.type="number"; i.step="1";
+  i.value = String(get(draft,path) / (scale||1));
+  i.addEventListener("input", ()=>{
+    const n = Number(i.value);
+    set(draft, path, Number.isFinite(n) ? Math.round(n*(scale||1)) : get(saved,path));
+    refresh();
+  });
+  return i;
+}
+
+function toggle(path){
+  const b=document.createElement("button");
+  b.type="button"; b.className="switch";
+  b.setAttribute("aria-pressed", String(!!get(draft,path)));
+  b.addEventListener("click", ()=>{
+    set(draft, path, !get(draft,path));
+    b.setAttribute("aria-pressed", String(!!get(draft,path)));
+    refresh();
+  });
+  return b;
+}
+
+function render(){
+  // açık varyantlar
+  const en=$("enabled"); en.innerHTML="";
+  for(const id of Object.keys(VLABEL)){
+    if(!(id in draft.enabled)) continue;
+    const r = row(`enabled.${id}`, VLABEL[id],
+      `Bahis: ${draft.stakes[id] ?? "—"} jeton`, toggle(`enabled.${id}`));
+    r.style.setProperty("--spine", `var(--${id})`);
+    r.style.boxShadow = "";
+    en.appendChild(r);
+  }
+  // süreler
+  const t=$("timers"); t.innerHTML="";
+  for(const k of ["bid","trump","play","handEnd","reconnect"]){
+    const [l,h]=TLABEL[k];
+    t.appendChild(row(`timers.${k}`, l, h+" (saniye)", numInput(`timers.${k}`, 1000)));
+  }
+  // varyant kuralları
+  const v=$("variants"); v.innerHTML="";
+  for(const [id,fields] of Object.entries(FIELDS)){
+    if(!draft.variants[id]) continue;
+    const box=document.createElement("div");
+    box.className="variant"; box.dataset.v=id;
+    const on = draft.enabled[id];
+    box.innerHTML=`<div class="vhead"><span class="vname">${VLABEL[id]}</span>
+      <span class="vstate ${on?"on":""}">${on?"açık":"kapalı"}</span></div>`;
+    for(const f of fields){
+      const [l,h]=RLABEL[f]; const p=`variants.${id}.${f}`;
+      const val=get(draft,p);
+      box.appendChild(row(p, l, h,
+        typeof val==="boolean" ? toggle(p) : numInput(p)));
+    }
+    v.appendChild(box);
+  }
+  refresh();
+}
+
+function refresh(){
+  let n=0;
+  document.querySelectorAll(".row").forEach(r=>{
+    const p=r.dataset.path;
+    const a=get(saved,p), b=get(draft,p);
+    const changed = JSON.stringify(a)!==JSON.stringify(b);
+    r.classList.toggle("changed", changed);
+    if(changed){
+      n++;
+      const fmt=(x)=> typeof x==="boolean" ? (x?"açık":"kapalı")
+        : p.startsWith("timers.") ? (x/1000)+" sn" : String(x);
+      r.querySelector(".was").textContent = `önce ${fmt(a)} → şimdi ${fmt(b)}`;
+    }
+  });
+  $("bar").classList.toggle("show", n>0);
+  $("barmsg").innerHTML = n===0 ? "" :
+    `<strong>${n}</strong> ayar değişti. Kaydedene kadar hiçbir masa etkilenmez.`;
+}
+
+function showErrors(issues){
+  document.querySelectorAll(".row").forEach(r=>{
+    r.classList.remove("invalid");
+    r.querySelector(".err").textContent="";
+  });
+  for(const i of issues){
+    const r=document.querySelector(`.row[data-path="${i.path}"]`);
+    if(r){ r.classList.add("invalid"); r.querySelector(".err").textContent=i.message; }
+  }
+}
+
+async function load(){
+  try{
+    const res = await fetch(`${API}/config`, {credentials:"same-origin"});
+    if(!res.ok) throw new Error(String(res.status));
+    saved = await res.json();
+  }catch(e){
+    demo = true;
+    saved = DEMO;
+    banner("Sunucuya bağlanılamadı — örnek değerler gösteriliyor. Kaydetme çalışmaz.", "bad");
+  }
+  draft = clone(saved);
+  $("stamp").textContent = demo ? "Örnek görünüm"
+    : saved.updatedAt ? `Son değişiklik: ${new Date(saved.updatedAt).toLocaleString("tr-TR")}${saved.updatedBy?" · "+saved.updatedBy:""}`
+    : "Henüz değiştirilmedi";
+  render();
+}
+
+async function save(){
+  $("save").disabled = true;
+  try{
+    const res = await fetch(`${API}/config`, {
+      method:"PUT", credentials:"same-origin",
+      headers:{"content-type":"application/json"},
+      body: JSON.stringify(draft),
+    });
+    const body = await res.json();
+    if(res.status === 422){ showErrors(body.issues||[]);
+      banner("Kaydedilmedi. İşaretli alanları düzeltin.", "bad"); return; }
+    if(!res.ok) throw new Error(body.error || String(res.status));
+    saved = body; draft = clone(saved); showErrors([]); render();
+    banner("Kaydedildi. Bundan sonra kurulan masalar yeni kurallarla açılır.", "ok");
+    $("stamp").textContent = `Son değişiklik: ${new Date(saved.updatedAt).toLocaleString("tr-TR")}${saved.updatedBy?" · "+saved.updatedBy:""}`;
+  }catch(e){
+    banner("Kaydedilemedi: "+e.message, "bad");
+  }finally{ $("save").disabled = false; }
+}
+
+async function loadTables(){
+  const box=$("tables");
+  try{
+    const res=await fetch(`${API}/tables`, {credentials:"same-origin"});
+    if(!res.ok) throw new Error();
+    const list=await res.json();
+    if(!list.length){ box.innerHTML='<p class="empty">Açık masa yok.</p>'; return; }
+    box.innerHTML = `<table><thead><tr>
+      <th>Masa</th><th>Varyant</th><th>Durum</th><th>El</th><th>Oyuncu</th><th>Bot</th>
+      </tr></thead><tbody>${list.map(t=>`<tr>
+        <td>${t.tableId}</td><td>${VLABEL[t.variant]||t.variant}</td>
+        <td>${({waiting:"bekliyor",playing:"oynuyor",handEnd:"el sonu",finished:"bitti"})[t.phase]||t.phase}</td>
+        <td>${t.handNo}</td><td>${t.players}/4</td><td>${t.bots}</td>
+      </tr>`).join("")}</tbody></table>`;
+  }catch(e){
+    box.innerHTML = '<p class="empty">Masa listesi alınamadı.</p>';
+  }
+}
+
+const DEMO = {
+  variants:{
+    esli:{id:"esli",minBid:5,maxBid:13,fixedTarget:null,mustPlayTrumpWhenVoid:false,contractorScoresActualTricks:true,forceLastBidder:true,slamBonus:false},
+    ihaleli:{id:"ihaleli",minBid:5,maxBid:13,fixedTarget:null,mustPlayTrumpWhenVoid:false,contractorScoresActualTricks:true,forceLastBidder:true,slamBonus:false},
+    koz:{id:"koz",minBid:0,maxBid:13,fixedTarget:3,mustPlayTrumpWhenVoid:false,contractorScoresActualTricks:true,forceLastBidder:true,slamBonus:false},
+    gonul:{id:"gonul",minBid:0,maxBid:13,fixedTarget:null,mustPlayTrumpWhenVoid:false,contractorScoresActualTricks:true,forceLastBidder:true,slamBonus:true}
+  },
+  timers:{bid:20000,trump:15000,play:20000,handEnd:5000,reconnect:90000},
+  enabled:{esli:true,ihaleli:false,koz:false,gonul:false},
+  stakes:{esli:100,ihaleli:100,koz:100,gonul:100},
+  updatedAt:null, updatedBy:null
+};
+
+$("save").addEventListener("click", save);
+$("reset").addEventListener("click", ()=>{ draft=clone(saved); showErrors([]); render(); });
+load();
+loadTables();
+setInterval(loadTables, 10000);
+</script>
+</body>
+</html>
