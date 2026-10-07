@@ -83,3 +83,49 @@ test("bos veya bozuk govde ayari bozmaz", () => {
   assert.deepEqual(validate(merge(c, "merhaba")), []);
   assert.deepEqual(validate(merge(c, { variants: { yok: { minBid: 3 } } })), []);
 });
+
+// ------------------------------------------------------------- oyunlar
+
+test("varsayilan oyun listesi gecerlidir", () => {
+  const c = defaultConfig();
+  assert.ok(c.games.length >= 4);
+  assert.equal(c.games.find((g) => g.id === "batak")?.status, "live");
+  assert.deepEqual(validate(c), []);
+});
+
+test("motoru olmayan oyun 'live' yapilamaz", () => {
+  const c = merge(defaultConfig(), {
+    games: [
+      { id: "batak", label: "Batak", status: "live" },
+      { id: "tavla", label: "Tavla", status: "live" },
+    ],
+  });
+  const issues = validate(c);
+  assert.ok(issues.some((i) => i.path === "games.tavla.status"),
+    "motoru olmayan oyun acildi");
+});
+
+test("tum oyunlar kapatilamaz", () => {
+  const c = merge(defaultConfig(), {
+    games: [{ id: "batak", label: "Batak", status: "soon" }],
+  });
+  assert.ok(validate(c).some((i) => i.path === "games"));
+});
+
+test("gecersiz durum 'soon' sayilir", () => {
+  const c = merge(defaultConfig(), {
+    games: [{ id: "batak", label: "Batak", status: "hacked" }],
+  });
+  assert.equal(c.games[0].status, "soon");
+});
+
+test("oyun kimligi dogrulanir", () => {
+  const c = merge(defaultConfig(), {
+    games: [
+      { id: "batak", label: "Batak", status: "live" },
+      { id: "KÖTÜ ID", label: "X", status: "soon" },
+    ],
+  });
+  // merge kucuk harfe cevirir; gecersiz karakter dogrulamada yakalanir
+  assert.ok(validate(c).some((i) => i.path.startsWith("games.")));
+});

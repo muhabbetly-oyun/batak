@@ -16,7 +16,21 @@ export interface Region {
   enabled: boolean;
 }
 
+export interface GameEntry {
+  id: string;
+  label: string;
+  /** Kisa tanitim. Kartin altinda gorunur. */
+  blurb: string;
+  /** "live" oynanabilir, "soon" yakinda, "off" listede gorunmez. */
+  status: "live" | "soon" | "off";
+}
+
 export interface RuntimeConfig {
+  /**
+   * Oyun listesi. Yeni oyun hazir olunca panelden "live" yapilir;
+   * yeniden dagitim gerekmez.
+   */
+  games: GameEntry[];
   /**
    * Salonlar. Bolge AYRI HAVUZ DEGIL, TERCIHTIR: ayni bolgeden bekleyen
    * masa varsa oraya oturulur, yoksa herhangi bir masaya. Ayri havuz
@@ -45,7 +59,19 @@ const DEFAULT_REGIONS: Region[] = [
   { id: "yurtdisi", label: "Yurt dışı",     enabled: true },
 ];
 
+const DEFAULT_GAMES: GameEntry[] = [
+  { id: "batak", label: "Batak",
+    blurb: "Dört kişilik masa, ihale ve koz. Eşli oynanır.", status: "live" },
+  { id: "okey101", label: "Okey 101",
+    blurb: "106 taş, per ve çift. Hazırlanıyor.", status: "soon" },
+  { id: "tavla", label: "Tavla",
+    blurb: "İki kişilik. Hazırlanıyor.", status: "soon" },
+  { id: "satranc", label: "Satranç",
+    blurb: "İki kişilik. Hazırlanıyor.", status: "soon" },
+];
+
 export const defaultConfig = (): RuntimeConfig => ({
+  games: DEFAULT_GAMES.map((g) => ({ ...g })),
   regions: DEFAULT_REGIONS.map((r) => ({ ...r })),
   variants: Object.fromEntries(
     Object.entries(VARIANTS).map(([k, v]) => [k, { ...v }]),
@@ -105,6 +131,37 @@ export function validate(c: RuntimeConfig): ValidationIssue[] {
     }
   }
 
+  // --- oyunlar ---
+  const gids = new Set<string>();
+  for (const g of c.games ?? []) {
+    if (!/^[a-z0-9]{2,20}$/.test(g.id)) {
+      out.push({ path: `games.${g.id}`, message: "Kimlik kucuk harf ve rakam olmali." });
+    }
+    if (!g.label || g.label.length > 24) {
+      out.push({ path: `games.${g.id}.label`, message: "Ad 1-24 karakter olmali." });
+    }
+    if (!["live", "soon", "off"].includes(g.status)) {
+      out.push({ path: `games.${g.id}.status`, message: "Durum live, soon veya off olmali." });
+    }
+    if (gids.has(g.id)) {
+      out.push({ path: `games.${g.id}`, message: "Ayni kimlik iki kez kullanilmis." });
+    }
+    gids.add(g.id);
+  }
+  // Batak kural motoru hazir olan tek oyun; baskasini "live" yapmak
+  // oyuncuyu bos bir ekrana goturur.
+  for (const g of c.games ?? []) {
+    if (g.status === "live" && g.id !== "batak") {
+      out.push({
+        path: `games.${g.id}.status`,
+        message: "Bu oyunun motoru henuz yok. Hazir olmadan acmayin.",
+      });
+    }
+  }
+  if (!(c.games ?? []).some((g) => g.status === "live")) {
+    out.push({ path: "games", message: "En az bir oyun oynanabilir olmali." });
+  }
+
   // --- salonlar ---
   const ids = new Set<string>();
   for (const r of c.regions ?? []) {
@@ -160,6 +217,7 @@ export function merge(current: RuntimeConfig, patch: unknown): RuntimeConfig {
     enabled: { ...current.enabled },
     stakes: { ...current.stakes },
     regions: (current.regions ?? []).map((r) => ({ ...r })),
+    games: (current.games ?? []).map((g) => ({ ...g })),
   };
   if (typeof patch !== "object" || patch === null) return next;
   const p = patch as Record<string, any>;
@@ -183,6 +241,23 @@ export function merge(current: RuntimeConfig, patch: unknown): RuntimeConfig {
   if (p.enabled && typeof p.enabled === "object") {
     for (const id of Object.keys(next.enabled)) {
       if (id in p.enabled) next.enabled[id] = Boolean(p.enabled[id]);
+    }
+  }
+  if (Array.isArray(p.games)) {
+    const seen = new Set<string>();
+    next.games = [];
+    for (const raw of p.games) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const id = String(raw.id ?? "").trim().toLowerCase();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const st = String(raw.status ?? "soon");
+      next.games.push({
+        id,
+        label: String(raw.label ?? id).trim().slice(0, 24),
+        blurb: String(raw.blurb ?? "").trim().slice(0, 120),
+        status: (st === "live" || st === "soon" || st === "off") ? st : "soon",
+      });
     }
   }
   if (Array.isArray(p.regions)) {

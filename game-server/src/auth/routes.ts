@@ -15,6 +15,8 @@ export interface AuthRoutesDeps {
   wallet: LocalWallet;
   /** Salon listesi ve canlilik. Istemci giris sonrasi gosterir. */
   salonlar(): Array<{ id: string; label: string; players: number; waiting: number }>;
+  /** Oyun listesi. "soon" olanlar da doner; istemci yakinda diye gosterir. */
+  oyunlar(): Array<{ id: string; label: string; blurb: string; status: string; players: number }>;
   /** Gunluk bonus miktari ve iflas tabani. */
   bonus: { amount: number; floor: number };
   secure: boolean;   // https ise cerez Secure isaretli
@@ -150,6 +152,12 @@ export async function handleAuth(
       const me = await d.players.profile(id);
       if (!me) { json(res, 404, { code: "NOT_FOUND" }); return true; }
       json(res, 200, me);
+      return true;
+    }
+
+    // --- oyunlar ---
+    if (p === "/api/oyunlar" && req.method === "GET") {
+      json(res, 200, d.oyunlar());
       return true;
     }
 

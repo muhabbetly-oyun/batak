@@ -294,6 +294,17 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
   border:1px solid rgba(255,255,255,.09);
   box-shadow:0 20px 54px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07);
 }
+.tabs{
+  display:flex; gap:4px; padding:4px; margin:0 0 18px; border-radius:11px;
+  background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.06);
+}
+.tabs button{
+  flex:1; padding:9px 10px; border:none; border-radius:8px; font-size:14px;
+  background:transparent; color:var(--muted); font-weight:500;
+}
+.tabs button[aria-selected=true]{
+  background:rgba(255,255,255,.1); color:var(--bone); font-weight:600;
+}
 .panel h2{
   margin:0 0 4px; font-size:19px; font-weight:600;
   font-variation-settings:"wdth" 106;
@@ -345,6 +356,41 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 }
 .hall-me{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
 .hall-me .nm{font-weight:600; font-size:14.5px}
+
+/* --- oyun seçimi --- */
+.oyunlar{
+  display:grid; gap:13px; margin:24px 0 auto;
+  grid-template-columns:repeat(auto-fill, minmax(236px, 1fr));
+}
+.oyun{
+  display:flex; flex-direction:column; gap:8px; align-items:flex-start;
+  padding:20px; border-radius:14px; font:inherit; text-align:left;
+  background:linear-gradient(180deg, rgba(34,64,73,.46), rgba(22,36,42,.55));
+  border:1px solid rgba(255,255,255,.09); color:var(--bone); cursor:pointer;
+  transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.oyun:hover{transform:translateY(-3px); border-color:var(--rail);
+  box-shadow:0 10px 26px rgba(0,0,0,.38)}
+.oyun .pips{font-size:19px; letter-spacing:2px; line-height:1}
+.oyun .lbl{font-size:19px; font-weight:700; font-variation-settings:"wdth" 108;
+  letter-spacing:-.015em}
+.oyun .blurb{font-size:12.5px; color:var(--muted); line-height:1.5}
+.oyun .tag{
+  margin-top:3px; font-size:11.5px; border-radius:999px; padding:3px 10px;
+  background:rgba(127,176,105,.14); color:var(--ok);
+  border:1px solid rgba(127,176,105,.3);
+}
+.oyun.soon{cursor:default; opacity:.62}
+.oyun.soon:hover{transform:none; border-color:rgba(255,255,255,.09); box-shadow:none}
+.oyun.soon .tag{background:rgba(255,255,255,.06); color:var(--dim);
+  border-color:rgba(255,255,255,.12)}
+
+.back{
+  display:inline-flex; align-items:center; gap:7px; margin-bottom:4px;
+  background:none; border:none; color:var(--muted); font-size:13px;
+  padding:4px 0; cursor:pointer;
+}
+.back:hover{color:var(--bone)}
 
 .hall-head{margin:26px 0 4px}
 .hall-head h2{
@@ -495,6 +541,10 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 
       <div class="panel">
         <div id="guest">
+          <div class="tabs" role="tablist">
+            <button type="button" id="tabLogin" role="tab" aria-selected="true">Giriş yap</button>
+            <button type="button" id="tabReg" role="tab" aria-selected="false">Hesap aç</button>
+          </div>
           <h2 id="panelTitle">Giriş yapın</h2>
           <p id="lobbytext">Hesabınız yoksa birkaç saniyede açılır.</p>
           <div class="form">
@@ -512,9 +562,6 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
           <div class="row">
             <button class="primary" id="go">Giriş yap</button>
             <button id="demo">Deneme masası</button>
-          </div>
-          <div class="switcher" id="switcher">
-            Hesabınız yok mu? <button type="button" id="toggle">Hesap açın</button>
           </div>
         </div>
 
@@ -535,15 +582,27 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
          </div>
        </div>
 
-       <div class="hall-head">
-         <h2>Nerede oynayalım?</h2>
-         <p>Salonunuzda bekleyen masa yoksa en yakın dolu masaya oturursunuz —
-            böylece kimse boş masada beklemez.</p>
+       <!-- 1. adım: oyun seçimi -->
+       <div id="oyunStep">
+         <div class="hall-head">
+           <h2>Ne oynayalım?</h2>
+           <p>Oynamak istediğiniz oyunu seçin.</p>
+         </div>
+         <div class="oyunlar" id="oyunlar"></div>
        </div>
 
-       <div class="salonlar" id="salonlar"></div>
+       <!-- 2. adım: salon seçimi -->
+       <div id="salonStep" hidden>
+         <button type="button" class="back" id="backToGames">&#8592; Oyunlar</button>
+         <div class="hall-head">
+           <h2 id="salonBaslik">Nerede oynayalım?</h2>
+           <p>Salonunuzda bekleyen masa yoksa en yakın dolu masaya oturursunuz —
+              böylece kimse boş masada beklemez.</p>
+         </div>
+         <div class="salonlar" id="salonlar"></div>
+       </div>
 
-       <div class="hall-foot">
+       <div class="hall-foot" id="hallFoot" hidden>
          <p class="note">
            Alıştırma masasında bahis yoktur; otuz saniyede dolmazsa
            boş koltukları bot alır.
@@ -1066,7 +1125,7 @@ function showMember() {
   $("hallView").hidden = false;
   $("meName").textContent = me.username;
   $("meChips").textContent = `${me.balance.toLocaleString("tr-TR")} jeton`;
-  void loadSalonlar();
+  if (oyun) { void loadSalonlar(); } else { backToGames(); }
 }
 
 function fieldErrors(issues) {
@@ -1108,6 +1167,57 @@ async function freshToken() {
 }
 
 let salon = localStorage.getItem("salon") || "genel";
+let oyun = null;   // secili oyun kimligi
+
+/** Oyun kartlari. "soon" olanlar tiklanamaz. */
+async function loadOyunlar() {
+  const box = $("oyunlar");
+  const r = await api("/api/oyunlar");
+  if (!r.ok || !Array.isArray(r.body)) return;
+
+  const PIPS = "\u2660\u2665\u2666\u2663";
+  box.innerHTML = "";
+  for (const g of r.body) {
+    const soon = g.status !== "live";
+    const b = el("button", "oyun" + (soon ? " soon" : ""));
+    b.type = "button";
+    b.disabled = soon;
+
+    const pips = el("div", "pips");
+    pips.innerHTML = [...PIPS].map((c, i) =>
+      `<span style="color:var(--${["spade","heart","diamond","club"][i]}-d)">${c}</span>`
+    ).join("");
+
+    const lbl = el("div", "lbl"); lbl.textContent = g.label;
+    const bl = el("div", "blurb"); bl.textContent = g.blurb || "";
+    const tag = el("span", "tag");
+    tag.textContent = soon
+      ? "Yakında"
+      : (g.players > 0 ? `${g.players} kişi oynuyor` : "Masa açık");
+
+    b.append(pips, lbl, bl, tag);
+    if (!soon) b.addEventListener("click", () => pickGame(g));
+    box.appendChild(b);
+  }
+}
+
+function pickGame(g) {
+  oyun = g.id;
+  $("salonBaslik").textContent = `${g.label} — nerede oynayalım?`;
+  $("oyunStep").hidden = true;
+  $("salonStep").hidden = false;
+  $("hallFoot").hidden = false;
+  void loadSalonlar();
+}
+
+function backToGames() {
+  oyun = null;
+  $("salonStep").hidden = true;
+  $("hallFoot").hidden = true;
+  $("oyunStep").hidden = false;
+  $("hallerr").textContent = "";
+  void loadOyunlar();
+}
 
 /** Salon listesi ve canlilik. Kalabalik salon yesil nokta ile isaretlenir. */
 async function loadSalonlar() {
@@ -1173,13 +1283,12 @@ async function submitAuth() {
 
 function setMode(next) {
   mode = next;
-  $("go").textContent = mode === "login" ? "Giriş yap" : "Hesap aç";
-  $("pw").autocomplete = mode === "login" ? "current-password" : "new-password";
-  $("switcher").innerHTML = mode === "login"
-    ? 'Hesabınız yok mu? <button type="button" id="toggle">Hesap açın</button>'
-    : 'Hesabınız var mı? <button type="button" id="toggle">Giriş yapın</button>';
-  $("toggle").addEventListener("click", () => setMode(mode === "login" ? "register" : "login"));
-  $("panelTitle").textContent = mode === "login" ? "Giriş yapın" : "Hesap açın";
+  const reg = mode === "register";
+  $("tabLogin").setAttribute("aria-selected", String(!reg));
+  $("tabReg").setAttribute("aria-selected", String(reg));
+  $("go").textContent = reg ? "Hesap aç" : "Giriş yap";
+  $("pw").autocomplete = reg ? "new-password" : "current-password";
+  $("panelTitle").textContent = reg ? "Hesap açın" : "Giriş yapın";
   $("lobbytext").textContent = mode === "login"
     ? "Hesabınız yoksa birkaç saniyede açılır."
     : "Kullanıcı adı ve parola yeter. Başlangıç jetonunuz hesabınıza yatar.";
@@ -1290,6 +1399,9 @@ $("sit").addEventListener("click", () => connect(false));
 $("sitPractice").addEventListener("click", () => connect(true));
 $("demo").addEventListener("click", demoStart);
 $("go").addEventListener("click", submitAuth);
+$("backToGames").addEventListener("click", backToGames);
+$("tabLogin").addEventListener("click", () => setMode("login"));
+$("tabReg").addEventListener("click", () => setMode("register"));
 $("bonus").addEventListener("click", claimBonus);
 $("out").addEventListener("click", logout);
 for (const id of ["u", "pw"]) {

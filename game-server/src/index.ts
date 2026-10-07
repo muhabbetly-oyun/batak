@@ -110,6 +110,19 @@ const server = http.createServer(async (req, res) => {
 
   if (await handleAuth(req, res, {
     players, wallet,
+    // Oyun listesi: "off" olanlar gizlenir, "soon" olanlar yakinda diye gorunur.
+    oyunlar: () => {
+      const live = registry.list();
+      return (config.current.games ?? [])
+        .filter((g) => g.status !== "off")
+        .map((g) => ({
+          id: g.id, label: g.label, blurb: g.blurb, status: g.status,
+          // Su an yalnizca batak masasi var; digerlerinde sayac sifir kalir.
+          players: g.id === "batak"
+            ? live.reduce((n, t) => n + t.players, 0)
+            : 0,
+        }));
+    },
     // Salon listesi: ayardaki acik salonlar + canli oyuncu sayilari.
     salonlar: () => {
       const stats = registry.regionStats();
