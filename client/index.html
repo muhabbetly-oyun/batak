@@ -275,32 +275,79 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 }
 #member .row button{min-width:116px}
 
-/* --- salon seçimi --- */
+/* ================= SALON SAHNESİ (giriş yapmış) =================
+   Tanıtım işini bitirdi; oyuncu artık nereye oturacağına bakıyor.
+   Sayfanın tamamı salonlara ayrılır. */
+.hall{
+  min-height:100%; display:flex; flex-direction:column;
+  max-width:1120px; margin:0 auto; padding:22px clamp(18px,4vw,36px) 28px;
+}
+.hall-top{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:14px; flex-wrap:wrap; padding-bottom:18px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.hall-brand{display:flex; align-items:baseline; gap:9px}
+.hall-brand .k{font-size:12.5px; color:var(--rail-hi); letter-spacing:.12em}
+.hall-brand .b{
+  font-size:23px; font-weight:700; font-variation-settings:"wdth" 114;
+  letter-spacing:-.02em; line-height:1;
+}
+.hall-me{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.hall-me .nm{font-weight:600; font-size:14.5px}
+
+.hall-head{margin:26px 0 4px}
+.hall-head h2{
+  margin:0; font-size:clamp(22px,3.4vw,30px); font-weight:700;
+  font-variation-settings:"wdth" 110; letter-spacing:-.02em;
+}
+.hall-head p{margin:7px 0 0; color:var(--muted); font-size:13.5px; max-width:52ch}
+
 .salonlar{
-  display:grid; gap:6px; margin:0 0 18px; max-height:216px; overflow-y:auto;
-  text-align:left; scrollbar-width:thin;
+  display:grid; gap:11px; margin:22px 0 auto;
+  grid-template-columns:repeat(auto-fill, minmax(214px, 1fr));
 }
 .salon{
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
-  width:100%; padding:9px 13px; border-radius:9px; font:inherit; font-size:14px;
-  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
-  color:var(--bone); cursor:pointer; text-align:left;
+  display:flex; flex-direction:column; align-items:flex-start; gap:7px;
+  padding:16px 17px; border-radius:12px; font:inherit; text-align:left;
+  background:linear-gradient(180deg, rgba(34,64,73,.42), rgba(22,36,42,.5));
+  border:1px solid rgba(255,255,255,.08); color:var(--bone); cursor:pointer;
+  transition:border-color .16s ease, transform .16s ease, box-shadow .16s ease;
 }
-.salon:hover{background:rgba(255,255,255,.07)}
+.salon:hover{transform:translateY(-2px); border-color:rgba(255,255,255,.18)}
 .salon[aria-pressed=true]{
-  border-color:var(--live); background:rgba(217,164,65,.13);
+  border-color:var(--live);
+  box-shadow:0 0 0 3px rgba(217,164,65,.14), 0 8px 22px rgba(0,0,0,.35);
+  background:linear-gradient(180deg, rgba(217,164,65,.14), rgba(22,36,42,.55));
 }
-.salon .cnt{
-  font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;
-  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
-}
+.salon .lbl{font-size:16px; font-weight:600; font-variation-settings:"wdth" 104}
 /* Kalabalık salon öne çıksın: insanlar insana gider. */
+.salon .cnt{
+  font-size:12.5px; color:var(--dim); font-variant-numeric:tabular-nums;
+  display:inline-flex; align-items:center; gap:6px;
+}
 .salon .cnt.live{color:var(--ok)}
 .salon .cnt.live::before{
-  content:""; width:6px; height:6px; border-radius:50%; background:var(--ok);
+  content:""; width:7px; height:7px; border-radius:50%; background:var(--ok);
+  box-shadow:0 0 0 3px rgba(127,176,105,.18);
 }
-.salonlbl{
-  font-size:12.5px; color:var(--muted); text-align:left; margin:0 0 7px;
+
+.hall-foot{
+  margin-top:26px; padding-top:20px; border-top:1px solid rgba(255,255,255,.08);
+  display:flex; align-items:center; justify-content:space-between;
+  gap:14px; flex-wrap:wrap;
+}
+.hall-foot .acts2{display:flex; gap:10px; flex-wrap:wrap}
+.hall-foot .primary{padding:12px 26px; font-size:15px}
+.hall-foot button{padding:11px 20px}
+.hall-foot .note{color:var(--dim); font-size:12.5px; max-width:40ch; line-height:1.5}
+
+@media (max-width:620px){
+  .hall-foot{flex-direction:column-reverse; align-items:stretch}
+  .hall-foot .acts2{justify-content:center}
+  .hall-foot .note{text-align:center}
+  .salonlar{grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:9px}
+  .salon{padding:13px 14px}
 }
 .hint{font-size:12.5px; color:var(--dim); margin:16px auto 0; line-height:1.5}
 .err{margin-top:14px; color:var(--bad); font-size:13px; min-height:18px}
@@ -353,7 +400,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
    </div>
 
     <div class="lobby" id="lobby">
-     <div class="split">
+     <div class="split" id="splitView">
 
       <div class="brand">
         <p class="kicker">Kahveden</p>
@@ -411,31 +458,43 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
           </div>
         </div>
 
-        <div id="member" hidden>
-          <h2>Salon seçin</h2>
-          <div class="who">
-            <span><b id="meName"></b></span>
-            <span class="chips" id="meChips"></span>
-          </div>
-          <p class="salonlbl">Salonunuzda masa yoksa en yakın dolu masaya oturursunuz.</p>
-          <div class="salonlar" id="salonlar"></div>
-          <div class="row">
-            <button class="primary" id="sit">Masaya otur</button>
-            <button id="sitPractice">Alıştırma masası</button>
-          </div>
-          <div class="row" style="margin-top:9px">
-            <button id="bonus">Günlük bonus</button>
-            <button id="out">Çıkış</button>
-          </div>
-          <p class="hint">
-            Alıştırma masasında bahis yoktur; otuz saniyede dolmazsa
-            boş koltukları bot alır.
-          </p>
-        </div>
-
         <div class="err" id="lobbyerr"></div>
       </div>
 
+     </div>
+
+     <!-- Giris yapildiginda: sayfanin tamami salonlara ayrilir -->
+     <div class="hall" id="hallView" hidden>
+       <div class="hall-top">
+         <div class="hall-brand"><span class="k">Kahveden</span><span class="b">Batak</span></div>
+         <div class="hall-me">
+           <span class="nm" id="meName"></span>
+           <span class="chips" id="meChips"></span>
+           <button id="bonus">Günlük bonus</button>
+           <button id="out">Çıkış</button>
+         </div>
+       </div>
+
+       <div class="hall-head">
+         <h2>Nerede oynayalım?</h2>
+         <p>Salonunuzda bekleyen masa yoksa en yakın dolu masaya oturursunuz —
+            böylece kimse boş masada beklemez.</p>
+       </div>
+
+       <div class="salonlar" id="salonlar"></div>
+
+       <div class="hall-foot">
+         <p class="note">
+           Alıştırma masasında bahis yoktur; otuz saniyede dolmazsa
+           boş koltukları bot alır.
+         </p>
+         <div class="acts2">
+           <button id="sitPractice">Alıştırma masası</button>
+           <button class="primary" id="sit">Masaya otur</button>
+         </div>
+       </div>
+
+       <div class="err" id="hallerr"></div>
      </div>
     </div>
   </div>
@@ -909,16 +968,16 @@ const api = async (path, opts = {}) => {
 };
 
 function showGuest() {
-  $("guest").hidden = false;
-  $("member").hidden = true;
+  $("splitView").hidden = false;
+  $("hallView").hidden = true;
 }
 
 function showMember() {
-  $("guest").hidden = true;
-  $("member").hidden = false;
-  void loadSalonlar();
+  $("splitView").hidden = true;
+  $("hallView").hidden = false;
   $("meName").textContent = me.username;
   $("meChips").textContent = `${me.balance.toLocaleString("tr-TR")} jeton`;
+  void loadSalonlar();
 }
 
 function fieldErrors(issues) {
@@ -972,11 +1031,11 @@ async function loadSalonlar() {
     const b = el("button", "salon");
     b.type = "button";
     b.setAttribute("aria-pressed", String(s.id === salon));
-    const nm = el("span"); nm.textContent = s.label;
+    const nm = el("span", "lbl"); nm.textContent = s.label;
     const cnt = el("span", "cnt" + (s.players > 0 ? " live" : ""));
     cnt.textContent = s.players > 0
       ? `${s.players} kişi` + (s.waiting > 0 ? ` · ${s.waiting} masa bekliyor` : "")
-      : "boş";
+      : "şu an boş";
     b.append(nm, cnt);
     b.addEventListener("click", () => {
       salon = s.id;
@@ -1045,10 +1104,10 @@ async function claimBonus() {
   if (r.ok) {
     me.balance = r.body.balance;
     showMember();
-    $("lobbyerr").textContent = "";
+    $("hallerr").textContent = "";
     toast(`<h3>Günlük bonus</h3><div class="big">+${r.body.amount.toLocaleString("tr-TR")}</div>`, 2600);
   } else {
-    $("lobbyerr").textContent = r.body.message || "Bonus alınamadı.";
+    $("hallerr").textContent = r.body.message || "Bonus alınamadı.";
   }
   $("bonus").disabled = false;
 }
