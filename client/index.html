@@ -191,13 +191,17 @@ body{
 }
 .chat.off{display:none}
 .chat-log{
-  display:flex; flex-direction:column; gap:5px; max-height:148px;
+  display:flex; flex-direction:column; gap:4px;
+  /* min-height:0 ŞART: flex ögesinin varsayılan min-height:auto değeri
+     max-height'ı ezer ve kutu içerik kadar uzar, kaydırma hiç çalışmaz. */
+  min-height:0; max-height:132px; flex:0 1 auto;
   overflow-y:auto; scrollbar-width:none; pointer-events:auto;
 }
 .chat-log::-webkit-scrollbar{display:none}
 .msg{
-  background:rgba(9,18,22,.76); border:1px solid rgba(255,255,255,.07);
-  border-radius:9px; padding:6px 10px; font-size:12.5px; line-height:1.45;
+  align-self:flex-start; max-width:100%;
+  background:rgba(9,18,22,.72); border-radius:9px;
+  padding:4px 10px; font-size:12.5px; line-height:1.4;
   animation:msgIn .18s ease-out;
 }
 .msg b{color:var(--rail-hi); font-weight:600; margin-right:5px}
@@ -1076,6 +1080,8 @@ function demoResolve() {
   demoView();
 
   if (d.trickNo === 13) {
+    d.phase = "ended";
+    demoView();
     const made = d.tricksWon[0] + d.tricksWon[2] >= d.highBid;
     toast(
       `<h3>El bitti</h3><div class="big">${d.tricksWon[0] + d.tricksWon[2]}</div>` +
@@ -1111,8 +1117,8 @@ const api = async (path, opts = {}) => {
     ...opts,
   });
   let body = {};
-  try { body = await r.json(); } catch { /* govdesiz yanit */ }
-  return { ok: r.ok, status: r.status, body };
+  try { body = await r.json(); } catch { /* govdesiz veya HTML yanit */ }
+  return { ok: r.ok, status: r.status, body: body || {} };
 };
 
 function showGuest() {
@@ -1261,23 +1267,37 @@ async function submitAuth() {
     return;
   }
 
-  $("go").disabled = true;
+  // Dugme sessiz kalmasin: basildiginda hicbir sey olmamasi en kotu durum.
+  const btn = $("go");
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = mode === "login" ? "Giriliyor…" : "Açılıyor…";
+
   try {
     const r = await api(mode === "login" ? "/api/giris" : "/api/kayit", {
       method: "POST", body: JSON.stringify({ username, password }),
     });
+
     if (!r.ok) {
-      fieldErrors(r.body.issues);
-      if (!r.body.issues || r.body.issues.length === 0) {
-        $("lobbyerr").textContent = r.body.message || "Olmadı, tekrar deneyin.";
+      fieldErrors(r.body && r.body.issues);
+      const hasField = r.body && Array.isArray(r.body.issues) && r.body.issues.length > 0;
+      if (!hasField) {
+        // Sunucu govdesiz veya beklenmedik yanit verdiyse de bir sey yazsin.
+        $("lobbyerr").textContent =
+          (r.body && r.body.message) ||
+          (r.status === 404
+            ? "Kayıt ucu bulunamadı. Bu önizleme sayfasında kayıt çalışmaz."
+            : `Olmadı (${r.status}). Tekrar deneyin.`);
       }
       return;
     }
     onAuthed(r.body);
   } catch (e) {
-    $("lobbyerr").textContent = "Sunucuya ulaşılamadı.";
+    $("lobbyerr").textContent =
+      "Sunucuya ulaşılamadı. Önizleme sayfasındaysanız kayıt çalışmaz.";
   } finally {
-    $("go").disabled = false;
+    btn.disabled = false;
+    btn.textContent = label;
   }
 }
 
@@ -1356,7 +1376,7 @@ function chatLine(m) {
     n.append(who, document.createTextNode(m.text));
   }
   log.appendChild(n);
-  while (log.childElementCount > 14) log.removeChild(log.firstChild);
+  while (log.childElementCount > 8) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
 
