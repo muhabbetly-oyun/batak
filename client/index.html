@@ -183,6 +183,56 @@ body{
 .hand .card.legal:hover,.hand .card.legal:focus-visible{transform:translateY(-10px); outline:none}
 .hand .card.legal:focus-visible{box-shadow:0 0 0 2px var(--live)}
 
+/* ---------- masa içi sohbet ---------- */
+.chat{
+  position:absolute; left:14px; bottom:14px; z-index:4;
+  width:min(272px, 38vw); display:flex; flex-direction:column; gap:7px;
+  pointer-events:none;
+}
+.chat.off{display:none}
+.chat-log{
+  display:flex; flex-direction:column; gap:5px; max-height:148px;
+  overflow-y:auto; scrollbar-width:none; pointer-events:auto;
+}
+.chat-log::-webkit-scrollbar{display:none}
+.msg{
+  background:rgba(9,18,22,.76); border:1px solid rgba(255,255,255,.07);
+  border-radius:9px; padding:6px 10px; font-size:12.5px; line-height:1.45;
+  animation:msgIn .18s ease-out;
+}
+.msg b{color:var(--rail-hi); font-weight:600; margin-right:5px}
+.msg.mine b{color:var(--ok)}
+.msg.sys{color:var(--dim); font-style:italic}
+@keyframes msgIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+@media (prefers-reduced-motion:reduce){ .msg{animation:none} }
+
+.chat-in{display:flex; gap:6px; pointer-events:auto}
+.chat-in input{
+  flex:1; min-width:0; padding:7px 11px; font:inherit; font-size:13px;
+  background:rgba(9,18,22,.8); color:var(--bone);
+  border:1px solid #2f535c; border-radius:999px;
+}
+.chat-in input:focus-visible{outline:2px solid var(--live); outline-offset:1px}
+.chat-in input:disabled{opacity:.5; cursor:not-allowed}
+.chat-in button{padding:7px 11px; border-radius:999px; font-size:16px; line-height:1}
+
+/* Hazır ifadeler: eşli masada el sürerken tek iletişim yolu. */
+.quicks{display:flex; flex-wrap:wrap; gap:5px; pointer-events:auto}
+.quicks button{
+  padding:5px 10px; font-size:12px; border-radius:999px;
+  background:rgba(9,18,22,.7); border:1px solid rgba(255,255,255,.1);
+}
+.chat-note{
+  font-size:11.5px; color:var(--dim); line-height:1.4;
+  background:rgba(9,18,22,.7); border-radius:7px; padding:5px 9px;
+  pointer-events:auto;
+}
+@media (max-width:760px){
+  .chat{left:8px; right:8px; bottom:8px; width:auto}
+  .chat-log{max-height:92px}
+  .quicks{display:none}
+}
+
 /* ---------- eylem çubuğu ---------- */
 .acts .wait{width:100%; text-align:center; font-size:13px; color:var(--dim)}
 .acts{
@@ -399,6 +449,16 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
     <div class="toast" id="toast"></div>
    </div>
 
+   <div class="chat off" id="chat">
+     <div class="chat-log" id="chatlog"></div>
+     <div class="quicks" id="quicks"></div>
+     <p class="chat-note" id="chatnote" hidden></p>
+     <div class="chat-in">
+       <input id="chatin" maxlength="200" placeholder="Mesaj yazın" autocomplete="off">
+       <button type="button" id="chatsend" aria-label="Gönder">&#10148;</button>
+     </div>
+   </div>
+
     <div class="lobby" id="lobby">
      <div class="split" id="splitView">
 
@@ -611,6 +671,7 @@ function render() {
 
   renderHand();
   renderActions();
+  syncChatLock();
   startDeadline();
 }
 
@@ -775,6 +836,8 @@ function onServer(m) {
     case "rejoined":
       mySeat = m.seat;
       $("lobby").classList.add("hide");
+      $("chat").classList.remove("off");
+      buildQuicks();
       break;
     case "state":
       view = m.view;
@@ -794,9 +857,20 @@ function onServer(m) {
       }
       if (view.phase === "finished") showResult();
       break;
+    case "left":
+      $("chat").classList.add("off");
+      $("chatlog").innerHTML = "";
+      break;
     case "error":
+      if (m.code === "CHAT_LOCKED" || m.code === "CHAT_RATE") {
+        chatLine({ sys: true, text: m.message });
+        break;
+      }
       $("lobbyerr").textContent = m.message || m.code;
       if (view) toast(`<h3>Olmadı</h3><p>${m.message || m.code}</p>`, 2600);
+      break;
+    case "chat":
+      chatLine(m);
       break;
     case "hand_aborted":
       toast(`<h3>El iptal edildi</h3><p>${m.reason}</p>`);
@@ -828,6 +902,8 @@ function demoStart() {
   demoMode = true;
   mySeat = 0;
   $("lobby").classList.add("hide");
+  $("chat").classList.remove("off");
+  buildQuicks();
   setConn("on", "deneme");
 
   const deck = Array.from({ length: 52 }, (_, i) => i);
@@ -879,6 +955,19 @@ function demoLegal(seat) {
 function demoHandle(msg) {
   const d = demo;
   if (!d) return;
+
+  if (msg.type === "chat" || msg.type === "quick") {
+    const text = msg.type === "quick"
+      ? (QUICKS.find((q) => q[0] === msg.id) || ["", msg.id])[1]
+      : msg.text;
+    chatLine({ seat: 0, username: "Siz", text });
+    // Deneme masasinda rakip kisa bir karsilik verir.
+    setTimeout(() => chatLine({
+      seat: 1, username: "Ayşe",
+      text: ["İyi oyunlar", "Tabii", "Hadi bakalım"][Math.floor(Math.random() * 3)],
+    }), 900);
+    return;
+  }
 
   if (msg.type === "bid" && d.turn === 0) {
     d.bids[0] = msg.value; d.highBid = msg.value; d.highBidder = 0;
@@ -1119,6 +1208,81 @@ async function logout() {
   if (ws) { try { ws.close(); } catch { /* yoksay */ } }
   showGuest();
 }
+
+
+/* ===================================================================
+   MASA ICI SOHBET
+   Esli masada EL SURERKEN serbest metin kapalidir: esler oyun icinde
+   serbestce konusabilseydi birbirini besleyip ucuncu ve dorduncu
+   oyuncuyu soymak cok kolay olurdu. El bitimleri arasinda acilir.
+   =================================================================== */
+
+const QUICKS = [
+  ["iyi_oyun", "İyi oyunlar"],
+  ["sira_sende", "Sıra sende"],
+  ["tebrikler", "Tebrikler"],
+  ["tesekkur", "Teşekkürler"],
+  ["guzel", "Güzel oynadın"],
+  ["acele_yok", "Acele yok"],
+];
+
+function buildQuicks() {
+  const box = $("quicks");
+  if (box.childElementCount) return;
+  for (const [id, label] of QUICKS) {
+    const b = el("button");
+    b.type = "button"; b.textContent = label;
+    b.addEventListener("click", () => send({ type: "quick", id }));
+    box.appendChild(b);
+  }
+}
+
+function chatLine(m) {
+  const log = $("chatlog");
+  const n = el("div", "msg" + (m.seat === mySeat ? " mine" : "") + (m.sys ? " sys" : ""));
+  if (m.sys) {
+    n.textContent = m.text;
+  } else {
+    const who = el("b"); who.textContent = m.username || `Koltuk ${m.seat}`;
+    n.append(who, document.createTextNode(m.text));
+  }
+  log.appendChild(n);
+  while (log.childElementCount > 14) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
+/** El surerken esli masada girisi kilitler. */
+function syncChatLock() {
+  const h = view && view.hand;
+  const running = view && view.phase === "playing" && h
+    && h.phase !== "ended" && h.phase !== "voided";
+  const locked = running && view.variant === "esli";
+
+  const input = $("chatin");
+  input.disabled = !!locked;
+  input.placeholder = locked ? "El sürerken hazır ifadeler" : "Mesaj yazın";
+  $("chatsend").disabled = !!locked;
+
+  const note = $("chatnote");
+  note.hidden = !locked;
+  if (locked) {
+    note.textContent =
+      "Eşli masada el sürerken serbest sohbet kapalı — eşinizle anlaşmayı önler.";
+  }
+}
+
+function sendChat() {
+  const input = $("chatin");
+  const text = input.value.trim();
+  if (!text) return;
+  send({ type: "chat", text });
+  input.value = "";
+}
+
+$("chatsend").addEventListener("click", sendChat);
+$("chatin").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); sendChat(); }
+});
 
 /* ------------------------------------------------- açılış */
 

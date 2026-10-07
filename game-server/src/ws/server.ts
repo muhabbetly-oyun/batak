@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { Seat } from "@muhabbetly/batak-engine";
 import type { TableRegistry } from "../tables/registry.js";
 import type { EventStore } from "../effects/persist.js";
-import { RateLimiter, parse, toMove } from "./protocol.js";
+import { QUICK_PHRASES, RateLimiter, parse, toMove } from "./protocol.js";
 
 /**
  * WebSocket sunucusu.
@@ -29,6 +29,8 @@ export interface WsDeps {
 export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
   const limiter = new RateLimiter(20, 10_000);
+  // Sohbet icin ayri, daha siki sinir: hamle hizini yavaslatmasin.
+  const chatLimiter = new RateLimiter(5, 10_000);
   /** userId -> acik baglanti. Bir oyuncunun tek baglantisi olur. */
   const live = new Map<string, Session>();
 
@@ -54,7 +56,7 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       const s = ws as Session;
       s.userId = who.userId;
       s.username = who.username;
-      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? undefined;
+      s.ip = (req.headers["x-real-ip"] as string) ?? req.socket.remoteAddress ?? null ?? undefined;
 
       // Ayni oyuncunun eski baglantisi varsa kapat: tek baglanti kurali
       // coklu sekme ile ayni masada iki kez oynamayi engeller.
@@ -133,6 +135,12 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       return;
     }
 
+    // --- sohbet ---
+    if (msg.type === "chat" || msg.type === "quick") {
+      await onChat(ws, msg);
+      return;
+    }
+
     // Hamleler
     const runner = d.registry.runnerFor(uid);
     const seat = d.registry.seatOf(uid);
@@ -153,6 +161,67 @@ export function attachWebSocket(server: Server, d: WsDeps): WebSocketServer {
       send(ws, { type: "error", code: res.error.code, message: res.error.message });
     }
     // Basarili hamlede gorunum runner tarafindan zaten gonderilir.
+  }
+
+  /**
+   * Masa ici sohbet.
+   *
+   * ESLI MASADA EL SURERKEN SERBEST METIN KAPALIDIR. Esler masa disinda
+   * zaten konusabilir; oyun icinde serbest metin, birbirini besleyip
+   * ucuncu ve dorduncu oyuncuyu soymanin en kolay yoludur. El bitimleri
+   * arasinda serbest sohbet acilir.
+   */
+  async function onChat(
+    ws: Session, msg: { type: "chat"; text: string } | { type: "quick"; id: string },
+  ): Promise<void> {
+    const uid = ws.userId!;
+    const runner = d.registry.runnerFor(uid);
+    const seat = d.registry.seatOf(uid);
+    if (!runner || seat === null) {
+      send(ws, { type: "error", code: "NOT_AT_TABLE", message: "Masada degilsiniz." });
+      return;
+    }
+    if (!chatLimiter.allow(`chat:${uid}`)) {
+      send(ws, { type: "error", code: "CHAT_RATE", message: "Biraz yavas." });
+      return;
+    }
+
+    const t = runner.snapshot;
+    const handRunning = t.phase === "playing" && t.hand !== null
+      && t.hand.phase !== "ended" && t.hand.phase !== "voided";
+
+    let text: string;
+    if (msg.type === "quick") {
+      text = QUICK_PHRASES[msg.id];
+    } else {
+      if (t.variant.partnership && handRunning) {
+        send(ws, {
+          type: "error", code: "CHAT_LOCKED",
+          message: "Eşli masada el sürerken yalnızca hazır ifadeler kullanılabilir.",
+        });
+        return;
+      }
+      text = msg.text;
+    }
+
+    const line = {
+      type: "chat",
+      seat, username: ws.username, text,
+      quick: msg.type === "quick",
+      at: Date.now(),
+    };
+
+    // Masadaki herkese; seyirci yok.
+    for (const i of [0, 1, 2, 3] as Seat[]) {
+      const other = t.seats[i].userId;
+      if (!other || t.seats[i].bot) continue;
+      const sock = live.get(other);
+      if (sock) send(sock, line);
+    }
+
+    // Moderasyon icin olay akisina yazilir.
+    void d.store.append(t.tableId, [{ ...line, type: "chat_said" }] as never, null)
+      .catch(() => {});
   }
 
   /** Koltuga gorunum gonderir. TableRunner bunu cagirir. */

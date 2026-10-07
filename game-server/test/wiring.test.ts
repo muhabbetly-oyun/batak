@@ -324,3 +324,43 @@ test("gecersiz salon kimligi protokolde dusurulur", () => {
   const good = parse(JSON.stringify({ type: "join", variantId: "esli", region: "ege" }));
   assert.equal(good.ok && (good.msg as any).region, "ege");
 });
+
+// ------------------------------------------------------------- sohbet
+
+import { QUICK_PHRASES } from "../src/ws/protocol.js";
+
+test("sohbet mesaji ayristirilir ve kirpilir", () => {
+  const r = parse(JSON.stringify({ type: "chat", text: "  merhaba   dostlar  " }));
+  assert.ok(r.ok);
+  assert.equal(r.ok && (r.msg as any).text, "merhaba dostlar");
+});
+
+test("bos sohbet reddedilir", () => {
+  assert.equal(parse('{"type":"chat","text":"   "}').ok, false);
+  assert.equal(parse('{"type":"chat","text":""}').ok, false);
+  assert.equal(parse('{"type":"chat"}').ok, false);
+});
+
+test("sohbet 200 karaktere kirpilir", () => {
+  const r = parse(JSON.stringify({ type: "chat", text: "a".repeat(500) }));
+  assert.ok(r.ok);
+  assert.equal(r.ok && (r.msg as any).text.length, 200);
+});
+
+test("kontrol karakterleri temizlenir", () => {
+  const r = parse(JSON.stringify({ type: "chat", text: "iyi\u0000oyun\u200b\u2028lar" }));
+  assert.ok(r.ok);
+  const t = r.ok ? (r.msg as any).text : "";
+  assert.ok(!/[\u0000\u200b\u2028]/.test(t), `temizlenmedi: ${JSON.stringify(t)}`);
+});
+
+test("bilinmeyen hazir ifade reddedilir", () => {
+  assert.equal(parse('{"type":"quick","id":"yok_boyle"}').ok, false);
+  assert.equal(parse('{"type":"quick","id":"iyi_oyun"}').ok, true);
+});
+
+test("hazir ifadeler tanimli ve bos degil", () => {
+  const vals = Object.values(QUICK_PHRASES);
+  assert.ok(vals.length >= 6);
+  for (const v of vals) assert.ok(v.trim().length > 0);
+});

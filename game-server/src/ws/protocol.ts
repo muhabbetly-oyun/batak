@@ -15,7 +15,24 @@ export type ClientMessage =
   | { type: "pass" }
   | { type: "trump"; suit: number }
   | { type: "play"; card: number }
+  | { type: "chat"; text: string }
+  | { type: "quick"; id: string }
   | { type: "ping" };
+
+/**
+ * Hazir ifadeler. Esli masada el surerken YALNIZCA bunlar kullanilabilir:
+ * serbest metin, eslerin birbirini beslemesine kapi acar.
+ */
+export const QUICK_PHRASES: Record<string, string> = {
+  iyi_oyun:   "İyi oyunlar",
+  tebrikler:  "Tebrikler",
+  tesekkur:   "Teşekkürler",
+  sira_sende: "Sıra sende",
+  acele_yok:  "Acele yok",
+  guzel:      "Güzel oynadın",
+  afiyet:     "Afiyet olsun",
+  gorusuruz:  "Görüşürüz",
+};
 
 export type ParseResult =
   | { ok: true; msg: ClientMessage }
@@ -40,6 +57,29 @@ export function parse(raw: string): ParseResult {
     case "leave":
     case "pass":
       return { ok: true, msg: { type: v.type } };
+
+    case "chat": {
+      if (typeof v.text !== "string") {
+        return { ok: false, code: "BAD_TEXT", message: "Metin gerekli." };
+      }
+      // Kontrol karakterleri temizlenir, bosluklar tek bosluga indirgenir.
+      const text = v.text
+        .replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028\u2029]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200);
+      if (!text) {
+        return { ok: false, code: "EMPTY_TEXT", message: "Boş mesaj." };
+      }
+      return { ok: true, msg: { type: "chat", text } };
+    }
+
+    case "quick": {
+      if (typeof v.id !== "string" || !(v.id in QUICK_PHRASES)) {
+        return { ok: false, code: "BAD_QUICK", message: "Bilinmeyen ifade." };
+      }
+      return { ok: true, msg: { type: "quick", id: v.id } };
+    }
 
     case "join": {
       if (typeof v.variantId !== "string" || !VARIANT_IDS.has(v.variantId)) {
