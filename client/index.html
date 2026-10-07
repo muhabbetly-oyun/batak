@@ -175,6 +175,23 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 }
 .lobby p{margin:0 0 22px; color:var(--muted); font-size:14px; max-width:40ch}
 .lobby .row{display:flex; gap:9px; justify-content:center; flex-wrap:wrap}
+.form{display:grid; gap:10px; width:min(300px,86vw); margin:0 auto 16px; text-align:left}
+.form label{font-size:12.5px; color:var(--muted); display:block; margin-bottom:4px}
+.form input{
+  width:100%; padding:10px 12px; font:inherit; font-size:15px;
+  background:#1e3740; color:var(--bone); border:1px solid #2f535c; border-radius:6px;
+}
+.form input:focus-visible{outline:2px solid var(--live); outline-offset:1px}
+.form .fe{color:var(--bad); font-size:12px; margin-top:3px; min-height:15px}
+.switcher{font-size:13px; color:var(--muted); margin-top:14px}
+.switcher button{
+  background:none; border:none; color:var(--live); padding:0 2px;
+  text-decoration:underline; font-size:13px; cursor:pointer;
+}
+.who{display:flex; gap:10px; align-items:center; justify-content:center;
+  font-size:13.5px; color:var(--muted); margin-bottom:16px}
+.who b{color:var(--bone); font-weight:600}
+.chips{color:var(--live); font-variant-numeric:tabular-nums; font-weight:600}
 .err{margin-top:16px; color:var(--bad); font-size:13.5px; min-height:19px}
 
 @media (max-width:420px){
@@ -217,11 +234,44 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
     <div class="lobby" id="lobby">
       <div>
         <h1>Batak</h1>
-        <p id="lobbytext">Dört kişilik masa. Oturduğunuzda diğer oyuncular beklenir.</p>
-        <div class="row">
-          <button class="primary" id="sit">Masaya otur</button>
-          <button id="demo">Deneme masası</button>
+
+        <!-- giris / kayit -->
+        <div id="guest">
+          <p id="lobbytext">Oynamak için giriş yapın. Hesabınız yoksa birkaç saniyede açılır.</p>
+          <div class="form">
+            <div>
+              <label for="u">Kullanıcı adı</label>
+              <input id="u" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20">
+              <div class="fe" id="ue"></div>
+            </div>
+            <div>
+              <label for="pw">Parola</label>
+              <input id="pw" type="password" autocomplete="current-password">
+              <div class="fe" id="pwe"></div>
+            </div>
+          </div>
+          <div class="row">
+            <button class="primary" id="go">Giriş yap</button>
+            <button id="demo">Deneme masası</button>
+          </div>
+          <div class="switcher" id="switcher">
+            Hesabınız yok mu? <button type="button" id="toggle">Hesap açın</button>
+          </div>
         </div>
+
+        <!-- giris yapmis -->
+        <div id="member" hidden>
+          <div class="who">
+            <span><b id="meName"></b></span>
+            <span class="chips" id="meChips"></span>
+          </div>
+          <div class="row">
+            <button class="primary" id="sit">Masaya otur</button>
+            <button id="bonus">Günlük bonus</button>
+            <button id="out">Çıkış</button>
+          </div>
+        </div>
+
         <div class="err" id="lobbyerr"></div>
       </div>
     </div>
@@ -455,17 +505,8 @@ const play = (card) => send({ type: "play", card });
 async function connect() {
   $("lobbyerr").textContent = "";
   setConn("", "bağlanıyor…");
-  let token;
-  try {
-    const r = await fetch("/oyun/bilet", { credentials: "same-origin" });
-    if (!r.ok) throw new Error("bilet alınamadı");
-    token = (await r.json()).token;
-  } catch (e) {
-    setConn("off", "bağlanamadı");
-    $("lobbyerr").textContent =
-      "Giriş bileti alınamadı. Muhabbetly'de oturumunuz açık mı?";
-    return;
-  }
+  const token = await freshToken();
+  if (!token) { setConn("off", "bağlanamadı"); showGuest(); return; }
 
   ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
@@ -655,18 +696,182 @@ function demoResolve() {
   if (d.turn !== 0) setTimeout(demoBots, 700);
 }
 
+
+/* ===================================================================
+   KIMLIK
+   Erisim bileti 15 dakikalik; BELLEKTE tutulur, localStorage'a yazilmaz.
+   Yenileme bileti HttpOnly cerezde: tarayicidaki JavaScript okuyamaz,
+   dolayisiyla XSS ile calinamaz.
+   =================================================================== */
+
+let accessToken = null;
+let me = null;
+let mode = "login";          // "login" | "register"
+let refreshTimer = null;
+
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, {
+    credentials: "same-origin",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(opts.headers || {}),
+    },
+    ...opts,
+  });
+  let body = {};
+  try { body = await r.json(); } catch { /* govdesiz yanit */ }
+  return { ok: r.ok, status: r.status, body };
+};
+
+function showGuest() {
+  $("guest").hidden = false;
+  $("member").hidden = true;
+}
+
+function showMember() {
+  $("guest").hidden = true;
+  $("member").hidden = false;
+  $("meName").textContent = me.username;
+  $("meChips").textContent = `${me.balance.toLocaleString("tr-TR")} jeton`;
+}
+
+function fieldErrors(issues) {
+  $("ue").textContent = ""; $("pwe").textContent = "";
+  for (const i of issues || []) {
+    if (i.field === "username") $("ue").textContent = i.message;
+    if (i.field === "password") $("pwe").textContent = i.message;
+  }
+}
+
+function onAuthed(body) {
+  accessToken = body.accessToken;
+  me = { ...body.player, balance: 0, held: 0 };
+  scheduleRefresh(body.expiresIn);
+  refreshProfile().then(showMember);
+  $("pw").value = "";
+}
+
+/** Bilet suresi dolmadan once sessizce tazele. */
+function scheduleRefresh(expiresIn) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  const ms = Math.max(30, (expiresIn || 900) - 60) * 1000;
+  refreshTimer = setTimeout(() => { void refreshSession(); }, ms);
+}
+
+async function refreshSession() {
+  const r = await api("/api/yenile", { method: "POST" });
+  if (!r.ok) { accessToken = null; me = null; showGuest(); return false; }
+  accessToken = r.body.accessToken;
+  me = { ...r.body.player, ...(me || {}) , ...r.body.player };
+  scheduleRefresh(r.body.expiresIn);
+  return true;
+}
+
+/** WebSocket el sikismasi icin taze bilet. */
+async function freshToken() {
+  if (accessToken) return accessToken;
+  return (await refreshSession()) ? accessToken : null;
+}
+
+async function refreshProfile() {
+  const r = await api("/api/ben");
+  if (r.ok) { me = r.body; if (!$("member").hidden) showMember(); }
+}
+
+async function submitAuth() {
+  const username = $("u").value.trim();
+  const password = $("pw").value;
+  fieldErrors([]);
+  $("lobbyerr").textContent = "";
+  if (!username || !password) {
+    $("lobbyerr").textContent = "Kullanıcı adı ve parola gerekli.";
+    return;
+  }
+
+  $("go").disabled = true;
+  try {
+    const r = await api(mode === "login" ? "/api/giris" : "/api/kayit", {
+      method: "POST", body: JSON.stringify({ username, password }),
+    });
+    if (!r.ok) {
+      fieldErrors(r.body.issues);
+      if (!r.body.issues || r.body.issues.length === 0) {
+        $("lobbyerr").textContent = r.body.message || "Olmadı, tekrar deneyin.";
+      }
+      return;
+    }
+    onAuthed(r.body);
+  } catch (e) {
+    $("lobbyerr").textContent = "Sunucuya ulaşılamadı.";
+  } finally {
+    $("go").disabled = false;
+  }
+}
+
+function setMode(next) {
+  mode = next;
+  $("go").textContent = mode === "login" ? "Giriş yap" : "Hesap aç";
+  $("pw").autocomplete = mode === "login" ? "current-password" : "new-password";
+  $("switcher").innerHTML = mode === "login"
+    ? 'Hesabınız yok mu? <button type="button" id="toggle">Hesap açın</button>'
+    : 'Hesabınız var mı? <button type="button" id="toggle">Giriş yapın</button>';
+  $("toggle").addEventListener("click", () => setMode(mode === "login" ? "register" : "login"));
+  $("lobbytext").textContent = mode === "login"
+    ? "Oynamak için giriş yapın. Hesabınız yoksa birkaç saniyede açılır."
+    : "Kullanıcı adı ve parola yeter. Başlangıç jetonunuz hesabınıza yatar.";
+  fieldErrors([]);
+  $("lobbyerr").textContent = "";
+}
+
+async function claimBonus() {
+  $("bonus").disabled = true;
+  const r = await api("/api/bonus", { method: "POST" });
+  if (r.ok) {
+    me.balance = r.body.balance;
+    showMember();
+    $("lobbyerr").textContent = "";
+    toast(`<h3>Günlük bonus</h3><div class="big">+${r.body.amount.toLocaleString("tr-TR")}</div>`, 2600);
+  } else {
+    $("lobbyerr").textContent = r.body.message || "Bonus alınamadı.";
+  }
+  $("bonus").disabled = false;
+}
+
+async function logout() {
+  await api("/api/cikis", { method: "POST" });
+  accessToken = null; me = null;
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (ws) { try { ws.close(); } catch { /* yoksay */ } }
+  showGuest();
+}
+
 /* ------------------------------------------------- açılış */
 
 $("sit").addEventListener("click", connect);
 $("demo").addEventListener("click", demoStart);
+$("go").addEventListener("click", submitAuth);
+$("bonus").addEventListener("click", claimBonus);
+$("out").addEventListener("click", logout);
+for (const id of ["u", "pw"]) {
+  $(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitAuth(); }
+  });
+}
+setMode("login");
 
-// Sunucuya bagli degilken deneme dusmesi one cikar
-fetch("/health").then((r) => {
-  if (!r.ok) throw new Error();
-}).catch(() => {
-  $("lobbytext").textContent =
-    "Oyun sunucusuna ulaşılamıyor. Arayüzü deneme masasında inceleyebilirsiniz.";
-});
+// Acilista: cerezdeki yenileme bileti varsa dogrudan ice al.
+(async () => {
+  try {
+    const h = await fetch("/health");
+    if (!h.ok) throw new Error();
+  } catch {
+    $("lobbytext").textContent =
+      "Oyun sunucusuna ulaşılamıyor. Arayüzü deneme masasında inceleyebilirsiniz.";
+    return;
+  }
+  if (await refreshSession()) { await refreshProfile(); showMember(); }
+})();
 </script>
 </body>
 </html>

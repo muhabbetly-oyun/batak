@@ -209,3 +209,95 @@ npm run build
 
 Motor paketi `file:../batak-engine` olarak bağlı. İki paketi aynı repoda
 yan yana tutun.
+
+---
+
+# Oyuncu sistemi ve cüzdan
+
+**Mimari değişikliği (7 Ekim 2026).** Muhabbetly bir canlı destek ürünü;
+oyunun kendi oyuncu sistemi var. Kimlik ve cüzdan artık oyun sunucusunda,
+Postgres'te.
+
+Bunun getirisi: cüzdan HTTP çağrısı olmaktan çıktı. `hold`/`settle` aynı
+veritabanında tek transaction — ağ kopması, imza, idempotans yarışı,
+mutabakat alarmı yok. Ya hepsi olur ya hiçbiri.
+
+Kural motoru, masa aktörü, bot, protokol ve panel **değişmedi**; hiçbiri
+kimlik kaynağını bilmiyordu.
+
+## Kurulum
+
+```bash
+docker compose exec -T postgres psql -U oyun -d oyun < db/003_players.sql
+```
+
+`.env` ekleyin:
+
+```
+SESSION_SECRET=<openssl rand -hex 32>
+SIGNUP_GIFT=5000
+DAILY_BONUS=1000
+BANKRUPT_FLOOR=500
+```
+
+Artık gerekmeyenler: `PLATFORM_BASE_URL`, `INTERNAL_API_SECRET`,
+`JWT_PUBLIC_KEY`, `REVERB_*`. Laravel dosyaları (`laravel/`) kullanılmıyor,
+referans olarak duruyor.
+
+## Uçlar
+
+| Uç | İş |
+| --- | --- |
+| `POST /api/kayit` | Kullanıcı adı + parola. Kayıt hediyesi otomatik yatar |
+| `POST /api/giris` | Erişim bileti + yenileme çerezi |
+| `POST /api/yenile` | Erişim biletini tazeler |
+| `POST /api/cikis` | Yenileme biletini iptal eder |
+| `GET /api/ben` | Profil ve bakiye |
+| `POST /api/bonus` | Günlük bonus |
+
+## Güvenlik kararları
+
+**İki katmanlı bilet.** Erişim bileti 15 dakikalık JWT, her WebSocket
+mesajında veritabanına gidilmez. Yenileme bileti 30 gün, veritabanında
+yalnızca SHA-256 özeti durur ve iptal edilebilir. Yenileme dönüşümlüdür:
+çalınan bilet bir kez kullanılır, sahibi fark eder.
+
+**Yenileme bileti HttpOnly çerezde.** Tarayıcıdaki JavaScript okuyamaz, XSS
+ile çalınamaz.
+
+**Parola scrypt ile özetlenir** (N=2^16, r=8, p=1), Node'un kendi kriptosunda,
+harici bağımlılık yok. Parametreler özetin içinde durur; ileride maliyeti
+artırsak bile eski parolalar doğrulanmaya devam eder.
+
+**Zamanlama sızıntısı kapalı.** Kullanıcı yoksa bile parola doğrulama
+maliyeti ödenir; cevap süresi "bu kullanıcı var mı" bilgisini vermez.
+
+**Türkçe büyük I tuzağı.** `"ADMIN".toLowerCase("tr-TR")` → `"admın"`.
+Katlamasaydık "ADMIN" ile "admin" **farklı hesaplar** olurdu ve biri çıkıp
+destek görevlisi taklidi yapıp jeton dolandırabilirdi. Hesap anahtarında
+ı/İ/I harflerini i'ye katlıyoruz. Bedeli: "ışık" ile "işık" aynı anahtara
+düşer. Taklit riskini bu bedele tercih ettik. Testi var.
+
+**Kaba kuvvet koruması.** 15 dakikada 8 hatalı denemeden sonra kilit;
+kullanıcı adı ve IP birlikte sayılır.
+
+## Jeton ekonomisi
+
+Kayıt hediyesi + günlük bonus. Bonus 20 saatte bir alınır. Bakiyesi
+tabanın altındaki oyuncuya tabana tamamlayacak kadar verilir — iflas eden
+oyuncu masaya dönebilsin, yoksa geri gelmez.
+
+**Yasal not.** Jeton hiçbir koşulda paraya veya mala dönüşmemeli; döndüğü
+anda 7258 sayılı kanun kapsamında kumar tartışması başlar. Hesaplar arası
+transfer kapalı olmalı — açılırsa anlaşmalı oyun tespiti anlamını yitirir.
+Jeton satışı yapılacaksa ETBİS kaydı, mesafeli satış sözleşmesi ve 18+ yaş
+sınırı gerekir. Hukukçunuzla teyit edin.
+
+## Testler
+
+```bash
+npm test
+```
+
+49 test: HMAC, protokol doğrulama, hız sınırı, masa eşleştirme, parola
+özetleme, kullanıcı adı kuralları, Türkçe harf katlama.

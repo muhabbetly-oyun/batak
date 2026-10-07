@@ -16,7 +16,8 @@
     "src/ws/protocol.ts",
     "src/tables/registry.ts",
     "src/tables/runner.ts",
+    "src/auth/password.ts",
     "test/**/*.ts",
-    
+    "shim/*.d.ts"
   ]
 }

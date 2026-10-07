@@ -4,11 +4,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { Redis } from "ioredis";
-import { importSPKI, jwtVerify, type KeyLike } from "jose";
 
 import { EventStore } from "./effects/persist.js";
-import { ReverbClient } from "./effects/reverb.js";
-import { WalletClient } from "./effects/wallet.js";
+import { LocalWallet } from "./wallet/local.js";
+import { PlayerService } from "./auth/players.js";
+import { handleAuth } from "./auth/routes.js";
 import { TableRegistry } from "./tables/registry.js";
 import { ConfigStore, basicAuthAdmin, handleAdmin } from "./admin/routes.js";
 import { attachWebSocket } from "./ws/server.js";
@@ -20,6 +20,7 @@ function env(k: string, fallback?: string): string {
   if (v === undefined) throw new Error(`Eksik ortam degiskeni: ${k}`);
   return v;
 }
+const num = (k: string, d: number) => Number(env(k, String(d)));
 
 const log = (level: "info" | "warn" | "error", msg: string, meta?: unknown): void => {
   const line = { t: new Date().toISOString(), level, msg, ...(meta ? { meta } : {}) };
@@ -46,47 +47,23 @@ redis.on("error", (e: Error) => log("error", "redis hatasi", { e: e.message }));
 
 const store = new EventStore(pool);
 const config = new ConfigStore(pool);
+const wallet = new LocalWallet(pool);
 
-const wallet = new WalletClient({
-  baseUrl: env("PLATFORM_BASE_URL", "http://10.8.0.1"),
-  secret: env("INTERNAL_API_SECRET"),
-  timeoutMs: 4_000,
+const players = new PlayerService(pool, wallet, {
+  secret: env("SESSION_SECRET"),
+  signupGift: num("SIGNUP_GIFT", 5000),
 });
 
-const reverb = new ReverbClient({
-  host: env("REVERB_HOST", "10.8.0.1"),
-  port: Number(env("REVERB_PORT", "8080")),
-  appId: env("REVERB_APP_ID"),
-  key: env("REVERB_APP_KEY"),
-  secret: env("REVERB_APP_SECRET"),
-  timeoutMs: 3_000,
-});
-
-// ----------------------------------------------------------- kimlik
-
-let jwtKey: KeyLike | null = null;
-async function publicKey(): Promise<KeyLike> {
-  if (jwtKey) return jwtKey;
-  const pem = env("JWT_PUBLIC_KEY", "").replace(/\\n/g, "\n");
-  if (!pem) throw new Error("JWT_PUBLIC_KEY tanimli degil");
-  jwtKey = await importSPKI(pem, "RS256");
-  return jwtKey;
-}
-
-async function verifyToken(token: string): Promise<{ userId: string; username: string }> {
-  const { payload } = await jwtVerify(token, await publicKey(), {
-    issuer: env("JWT_ISSUER", "muhabbetly"),
-    audience: env("JWT_AUDIENCE", "game"),
-    algorithms: ["RS256"],
-    clockTolerance: 30,
-  });
-  const userId = payload.sub;
-  if (typeof userId !== "string" || !userId) throw new Error("Token icinde sub yok");
-  return {
-    userId,
-    username: typeof payload.username === "string" ? payload.username : userId,
-  };
-}
+/**
+ * Masa yayini. Reverb'in yerini aliyor: oyun artik bagimsiz bir urun,
+ * masa olaylari kendi WebSocket'imizden gidiyor. Olaylar zaten her koltuga
+ * `state` olarak ulasiyor; burasi seyirci ve sohbet icin ayrilmis durumda.
+ */
+const broadcast = {
+  async publish(_channel: string, _event: string, _data: unknown): Promise<boolean> {
+    return true;
+  },
+};
 
 // ----------------------------------------------------------- masa kaydi
 
@@ -95,10 +72,8 @@ let sendToSeat: (tableId: string, seat: 0 | 1 | 2 | 3, payload: unknown) => void
   () => { /* ws hazir degil */ };
 
 const registry = new TableRegistry(
-  {
-    wallet, reverb, store, log,
-    sendToSeat: (t, s, p) => sendToSeat(t, s, p),
-  },
+  { wallet: wallet as never, reverb: broadcast as never, store, log,
+    sendToSeat: (t, s, p) => sendToSeat(t, s, p) },
   () => config.current,
 );
 
@@ -106,12 +81,14 @@ const registry = new TableRegistry(
 const sweeper = setInterval(() => {
   const n = registry.sweep();
   if (n > 0) log("info", `${n} masa temizlendi`);
+  void players.sweep().catch(() => {});
 }, 60_000);
 sweeper.unref();
 
 // ----------------------------------------------------------- http
 
 let panelHtml = "";
+let clientHtml = "";
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -131,22 +108,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (await handleAuth(req, res, {
+    players, wallet,
+    bonus: { amount: num("DAILY_BONUS", 1000), floor: num("BANKRUPT_FLOOR", 500) },
+    secure: env("COOKIE_SECURE", "1") === "1",
+  })) return;
+
   if (await handleAdmin(req, res, {
     config, registry, adminIdOf: basicAuthAdmin, panelHtml,
   })) return;
+
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(clientHtml);
+    return;
+  }
 
   res.writeHead(404, { "content-type": "application/json" });
   res.end(JSON.stringify({ error: "not_found" }));
 });
 
-const wss = attachWebSocket(server, { registry, store, verifyToken, log });
+const wss = attachWebSocket(server, {
+  registry, store,
+  verifyToken: (t) => players.verifyAccess(t),
+  log,
+});
 sendToSeat = (wss as any).sendToSeat;
 
 // ----------------------------------------------------------- acilis
 
 async function boot(): Promise<void> {
-  panelHtml = await readFile(join(here, "..", "admin", "index.html"), "utf8")
-    .catch(() => "<!doctype html><title>Panel bulunamadi</title><p>admin/index.html eksik.");
+  const read = (rel: string, fb: string) =>
+    readFile(join(here, "..", rel), "utf8").catch(() => fb);
+  panelHtml = await read("admin/index.html",
+    "<!doctype html><title>Panel</title><p>admin/index.html eksik.");
+  clientHtml = await read("client/index.html",
+    "<!doctype html><title>Oyun</title><p>client/index.html eksik.");
 
   await config.load();
   log("info", "ayar yuklendi", {
@@ -154,7 +151,7 @@ async function boot(): Promise<void> {
       .filter(([, v]) => v).map(([k]) => k),
   });
 
-  const port = Number(env("PORT", "3000"));
+  const port = num("PORT", 3000);
   server.listen(port, "0.0.0.0", () => log("info", `${port} portunda dinleniyor`));
 }
 
