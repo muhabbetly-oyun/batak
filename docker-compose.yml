@@ -1,0 +1,93 @@
+name: muhabbetly-oyun
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      OYUN_DOMAIN: ${OYUN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      ADMIN_HASH: ${ADMIN_HASH}
+    depends_on:
+      game: { condition: service_healthy }
+    networks: [edge]
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: "160m" }
+
+  game:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PGHOST: postgres
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    networks: [edge, backend]
+    ulimits:
+      nofile: { soft: 65535, hard: 65535 }
+    deploy:
+      resources:
+        limits: { cpus: "1", memory: "768m" }
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./game-server/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: "0.75", memory: "768m" }
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy noeviction
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: "0.3", memory: "256m" }
+
+networks:
+  edge:
+  backend: { internal: true }
+
+volumes:
+  pg_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

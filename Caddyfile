@@ -1,0 +1,41 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$OYUN_DOMAIN} {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    -Server
+  }
+
+  # Yonetim paneli: temel kimlik dogrulama.
+  # Korumasiz birakilirsa jeton ekonomisini herkes degistirir.
+  handle /admin* {
+    basic_auth {
+      admin {$ADMIN_HASH}
+    }
+    reverse_proxy game:3000
+  }
+
+  @ws {
+    path /ws*
+    header Connection *Upgrade*
+    header Upgrade websocket
+  }
+  handle @ws {
+    reverse_proxy game:3000 {
+      flush_interval -1
+      header_up X-Real-IP {remote_host}
+    }
+  }
+
+  handle {
+    reverse_proxy game:3000 {
+      header_up X-Real-IP {remote_host}
+    }
+  }
+}
