@@ -13,8 +13,10 @@
   --rail:#8a6a3c; --rail-hi:#c49a5c;
   --bone:#ece6d9; --muted:#8fa6ac; --dim:#5d7b83;
   --spade:#1a1a1a; --heart:#c7302b; --diamond:#2d6fc4; --club:#2f7d4f;
+  /* koyu zeminde okunan karsiliklari */
+  --spade-d:#e4ded2; --heart-d:#f0726d; --diamond-d:#6aa8f5; --club-d:#79c795;
   --live:#d9a441; --ok:#7fb069; --bad:#d8504b;
-  --card-w:clamp(44px,8.5vw,62px);
+  --card-w:clamp(46px,9vw,64px);
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
@@ -38,6 +40,7 @@ body{
 .bar .ttl{font-weight:600; font-variation-settings:"wdth" 108}
 .bar .sep{color:var(--dim)}
 .trump{display:inline-flex; align-items:center; gap:5px}
+.trump[hidden]{display:none}
 .trump b{font-size:17px; line-height:1}
 .bar .right{margin-left:auto; display:flex; gap:12px; align-items:center}
 .conn{display:inline-flex; align-items:center; gap:6px; color:var(--muted)}
@@ -47,12 +50,21 @@ body{
 
 /* ---------- masa ---------- */
 .felt{
-  flex:1; position:relative; min-height:0;
-  background:
-    radial-gradient(ellipse 70% 60% at 50% 45%, var(--felt-hi), var(--felt) 70%);
-  border-top:2px solid var(--rail);
-  border-bottom:2px solid var(--rail);
+  flex:1; position:relative; min-height:0; display:grid; place-items:center;
+  background:var(--ink); padding:14px;
+  border-top:2px solid var(--rail); border-bottom:2px solid var(--rail);
 }
+/* Masa yuzeyi: ekrana degil, sabit oranli bir yuzeye yerlesir.
+   Genis ekranda masa bos bir alana donusmesin. */
+.table{
+  position:relative;
+  width:min(560px, 100%); height:min(100%, 400px);
+  border-radius:50% / 42%;
+  background:radial-gradient(ellipse 72% 66% at 50% 46%, var(--felt-hi), var(--felt) 72%);
+  border:3px solid var(--rail);
+  box-shadow:inset 0 0 44px rgba(0,0,0,.42), 0 10px 34px rgba(0,0,0,.4);
+}
+@media (max-height:560px){ .table{ height:100% } }
 
 /* oyuncu etiketleri */
 .seat{
@@ -66,10 +78,10 @@ body{
 .seat .st{color:var(--muted); font-size:11.5px; display:flex; gap:7px}
 .seat .tag{color:var(--live)}
 .seat .tag.off{color:var(--bad)}
-.seat.s0{bottom:14px; left:14px}
-.seat.s1{left:14px; top:50%; transform:translateY(-50%)}
-.seat.s2{top:14px; left:50%; transform:translateX(-50%)}
-.seat.s3{right:14px; top:50%; transform:translateY(-50%)}
+.seat.s0{bottom:4%;  left:50%; transform:translateX(-50%)}
+.seat.s1{left:2%;    top:50%;  transform:translateY(-50%)}
+.seat.s2{top:4%;     left:50%; transform:translateX(-50%)}
+.seat.s3{right:2%;   top:50%;  transform:translateY(-50%)}
 
 /* süre halkası */
 .ring{width:100%; height:3px; border-radius:2px; background:rgba(255,255,255,.12); overflow:hidden}
@@ -77,7 +89,7 @@ body{
 
 /* orta — oynanan tur */
 .trick{
-  position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+  position:absolute; left:50%; top:48%; transform:translate(-50%,-50%);
   display:grid; grid-template-columns:repeat(3,var(--card-w));
   grid-template-rows:repeat(3,calc(var(--card-w)*1.45));
   gap:4px; place-items:center;
@@ -164,7 +176,8 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
 
 @media (max-width:420px){
   .seat{min-width:0; padding:5px 8px; font-size:11.5px}
-  .seat.s0{left:10px; bottom:10px}
+  .felt{padding:8px}
+  .table{border-width:2px}
   .bar{font-size:12px; gap:8px; padding:8px 11px}
 }
 @media (prefers-reduced-motion:reduce){
@@ -187,6 +200,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
   </div>
 
   <div class="felt" id="felt">
+   <div class="table" id="table">
     <div class="trick" id="trick"></div>
 
     <div class="seat s0" data-seat="0"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
@@ -195,6 +209,7 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
     <div class="seat s3" data-seat="3"><div class="nm"></div><div class="st"></div><div class="ring"><i></i></div></div>
 
     <div class="toast" id="toast"></div>
+   </div>
 
     <div class="lobby" id="lobby">
       <div>
@@ -223,10 +238,10 @@ button.suit{font-size:19px; padding:7px 14px; line-height:1.2}
    =================================================================== */
 
 const SUITS = [
-  { g: "\u2660", c: "var(--spade)",   n: "Maça"  },
-  { g: "\u2665", c: "var(--heart)",   n: "Kupa"  },
-  { g: "\u2666", c: "var(--diamond)", n: "Karo"  },
-  { g: "\u2663", c: "var(--club)",    n: "Sinek" },
+  { g: "\u2660", c: "var(--spade)",   d: "var(--spade-d)",   n: "Maça"  },
+  { g: "\u2665", c: "var(--heart)",   d: "var(--heart-d)",   n: "Kupa"  },
+  { g: "\u2666", c: "var(--diamond)", d: "var(--diamond-d)", n: "Karo"  },
+  { g: "\u2663", c: "var(--club)",    d: "var(--club-d)",    n: "Sinek" },
 ];
 const RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
 const suitOf = (c) => Math.floor(c / 13);
@@ -273,11 +288,11 @@ function render() {
   if (h && h.trump !== null && h.trump !== undefined) {
     tb.hidden = false;
     const s = SUITS[h.trump];
-    const b = $("trump"); b.textContent = s.g; b.style.color = s.c;
+    const b = $("trump"); b.textContent = s.g; b.style.color = s.d;
   } else tb.hidden = true;
 
   $("score").textContent = view.scores
-    ? view.scores.map((v, i) => (i === mySeat ? `★${v}` : v)).join(" / ")
+    ? view.scores.map((v, i) => (i === mySeat ? `siz ${v}` : String(v))).join(" \u00b7 ")
     : "";
 
   // koltuklar — kendi koltugum daima altta gorunur
@@ -371,7 +386,7 @@ function renderActions() {
     a.appendChild(l);
     SUITS.forEach((s, i) => {
       const b = el("button", "suit");
-      b.innerHTML = `<span style="color:${s.c}">${s.g}</span>`;
+      b.innerHTML = `<span style="color:${s.d}">${s.g}</span>`;
       b.setAttribute("aria-label", s.n);
       b.title = s.n;
       b.addEventListener("click", () => send({ type: "trump", suit: i }));
