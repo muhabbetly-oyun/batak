@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Batak kuralları — Muhabbetly</title>
+<title>Kahveden Batak — yönetim</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..700;1,62..125,400&display=swap" rel="stylesheet">
@@ -103,6 +103,24 @@ td{padding:9px 10px 9px 0; border-bottom:1px solid rgba(46,80,88,.45); font-vari
 td:last-child,th:last-child{text-align:right; padding-right:0}
 .empty{color:var(--dim); padding:22px 0; font-size:14px}
 
+/* ---- oyun ve salon satırları ---- */
+select{
+  width:100%; background:var(--panel); color:var(--bone);
+  border:1px solid var(--line); border-radius:4px;
+  padding:7px 9px; font:inherit; font-size:13.5px;
+}
+select:focus-visible{outline:2px solid var(--esli); outline-offset:2px}
+.addrow{display:flex; gap:8px; margin:12px 0 0; flex-wrap:wrap}
+.addrow input{
+  flex:1; min-width:140px; background:var(--panel); color:var(--bone);
+  border:1px solid var(--line); border-radius:4px; padding:7px 10px; font:inherit;
+}
+.rmv{
+  background:transparent; border:1px solid var(--line); color:var(--muted);
+  border-radius:4px; padding:5px 9px; font-size:12.5px;
+}
+.rmv:hover{border-color:var(--bad); color:var(--bad)}
+
 /* ---- kaydet çubuğu ---- */
 .bar{
   position:fixed; left:0; right:0; bottom:0; z-index:20;
@@ -146,12 +164,31 @@ button:disabled{opacity:.45; cursor:not-allowed}
 <div class="wrap">
 
 <header>
-  <h1>Batak kuralları</h1>
+  <h1>Kahveden Batak — yönetim</h1>
   <p class="sub">Buradaki değişiklikler yalnızca <em>yeni kurulan</em> masalara uygulanır. Şu an oynanan masalar kendi kurallarıyla biter.</p>
   <p class="stamp" id="stamp">Yükleniyor…</p>
 </header>
 
 <div class="banner" id="banner"></div>
+
+<section>
+  <h2>Oyunlar</h2>
+  <p class="note">Oyun hazır olduğunda <em>oynanabilir</em> yapın. Motoru olmayan
+     bir oyunu açmaya çalışırsanız kayıt reddedilir — oyuncu boş ekrana düşmesin.</p>
+  <div id="games"></div>
+</section>
+
+<section>
+  <h2>Salonlar</h2>
+  <p class="note">Salon ayrı havuz değil, eşleştirme tercihidir: oyuncunun
+     salonunda bekleyen masa yoksa başka salondaki masaya oturur. Çok sayıda
+     salon açmak masa doluluğunu böler; 14'ten fazlası reddedilir.</p>
+  <div id="regions"></div>
+  <div class="addrow">
+    <input id="newRegion" maxlength="30" placeholder="Yeni salon adı (örn. Manisa)">
+    <button type="button" id="addRegion">Salon ekle</button>
+  </div>
+</section>
 
 <section>
   <h2>Açık varyantlar</h2>
@@ -253,6 +290,18 @@ function numInput(path, scale){
   return i;
 }
 
+function select(path, options){
+  const sel = document.createElement("select");
+  for(const [v,label] of options){
+    const o = document.createElement("option");
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  }
+  sel.value = String(get(draft,path));
+  sel.addEventListener("change", ()=>{ set(draft, path, sel.value); refresh(); });
+  return sel;
+}
+
 function toggle(path){
   const b=document.createElement("button");
   b.type="button"; b.className="switch";
@@ -263,6 +312,53 @@ function toggle(path){
     refresh();
   });
   return b;
+}
+
+/** Oyun listesi. Durum: oynanabilir / yakında / gizli. */
+function renderGames(){
+  const box = $("games"); box.innerHTML = "";
+  (draft.games || []).forEach((g, i) => {
+    const r = row(`games.${i}.status`, g.label, g.blurb || g.id,
+      select(`games.${i}.status`, [
+        ["live", "oynanabilir"], ["soon", "yakında"], ["off", "gizli"],
+      ]));
+    box.appendChild(r);
+  });
+}
+
+/** Salon listesi. Ad düzenlenir, açık/kapalı çevrilir, satır silinir. */
+function renderRegions(){
+  const box = $("regions"); box.innerHTML = "";
+  (draft.regions || []).forEach((rg, i) => {
+    const r = row(`regions.${i}.enabled`, rg.label, `kimlik: ${rg.id}`,
+      toggle(`regions.${i}.enabled`));
+    const rm = document.createElement("button");
+    rm.type = "button"; rm.className = "rmv"; rm.textContent = "sil";
+    rm.addEventListener("click", ()=>{
+      draft.regions.splice(i,1);
+      renderRegions(); refresh();
+    });
+    r.querySelector("div").appendChild(rm);
+    box.appendChild(r);
+  });
+}
+
+function addRegion(){
+  const input = $("newRegion");
+  const label = input.value.trim();
+  if(!label) return;
+  // Kimlik ad'dan turetilir; Turkce harfler sadelestirilir.
+  const id = label.toLocaleLowerCase("tr-TR")
+    .replace(/ı/g,"i").replace(/ş/g,"s").replace(/ğ/g,"g")
+    .replace(/ü/g,"u").replace(/ö/g,"o").replace(/ç/g,"c")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24);
+  if(!id){ banner("Bu ad kimliğe çevrilemedi, başka bir ad deneyin.", "bad"); return; }
+  if((draft.regions||[]).some(r=>r.id===id)){
+    banner("Bu salon zaten var.", "bad"); return;
+  }
+  draft.regions = [...(draft.regions||[]), { id, label, enabled: true }];
+  input.value = "";
+  renderRegions(); refresh();
 }
 
 function render(){
@@ -312,7 +408,11 @@ function refresh(){
     if(changed){
       n++;
       const fmt=(x)=> typeof x==="boolean" ? (x?"açık":"kapalı")
-        : p.startsWith("timers.") ? (x/1000)+" sn" : String(x);
+        : p.startsWith("timers.") ? (x/1000)+" sn"
+        : x === "live" ? "oynanabilir"
+        : x === "soon" ? "yakında"
+        : x === "off"  ? "gizli"
+        : String(x);
       r.querySelector(".was").textContent = `önce ${fmt(a)} → şimdi ${fmt(b)}`;
     }
   });
@@ -396,11 +496,26 @@ const DEMO = {
     gonul:{id:"gonul",minBid:0,maxBid:13,fixedTarget:null,mustPlayTrumpWhenVoid:false,contractorScoresActualTricks:true,forceLastBidder:true,slamBonus:true}
   },
   timers:{bid:20000,trump:15000,play:20000,handEnd:5000,reconnect:90000},
+  games:[
+    {id:"batak",label:"Batak",blurb:"Dört kişilik masa, ihale ve koz.",status:"live"},
+    {id:"okey101",label:"Okey 101",blurb:"106 taş. Hazırlanıyor.",status:"soon"},
+    {id:"tavla",label:"Tavla",blurb:"İki kişilik. Hazırlanıyor.",status:"soon"},
+    {id:"satranc",label:"Satranç",blurb:"İki kişilik. Hazırlanıyor.",status:"soon"}
+  ],
+  regions:[
+    {id:"genel",label:"Genel salon",enabled:true},
+    {id:"marmara",label:"Marmara",enabled:true},
+    {id:"ege",label:"Ege",enabled:true}
+  ],
   enabled:{esli:true,ihaleli:false,koz:false,gonul:false},
   stakes:{esli:100,ihaleli:100,koz:100,gonul:100},
   updatedAt:null, updatedBy:null
 };
 
+$("addRegion").addEventListener("click", addRegion);
+$("newRegion").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){ e.preventDefault(); addRegion(); }
+});
 $("save").addEventListener("click", save);
 $("reset").addEventListener("click", ()=>{ draft=clone(saved); showErrors([]); render(); });
 load();
